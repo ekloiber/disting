@@ -12,6 +12,10 @@ typedef long long i64;
 #define MAX_PHASE_INC   ( 0x10000000u )         // fs/16, about 4.7 kHz
 #define QUANT_HYST      ( 0xA000 )              // 0.625 semitone, Q16
 #define Z_SMOOTH_SHIFT  ( 8 )                   // ~3.4 ms smoothing at 75 kHz
+#define AHR_FULL        ( 1 << 30 )
+#define AHR_ATTACK_AIM  ( AHR_FULL + ( AHR_FULL >> 2 ) )   // attack aims past full so it arrives
+
+enum { kSbStageIdle, kSbStageAttack, kSbStageHold, kSbStageRelease };
 
 static int clampInt( i64 v, int lo, int hi )
 {
@@ -52,6 +56,15 @@ void sbInit( SubBassState* s, int zCounts )
     s->driveMix = 0;
     s->levelVolts = 0;
     s->envSrc = 0;
+    s->mode = 0;
+    s->threshold = kThresholdQ19[50];
+    s->rearm = kThresholdQ19[50] >> 1;
+    s->holdSamples = 0;
+    s->det = 0;
+    s->armed = 1;
+    s->stage = kSbStageIdle;
+    s->holdCount = 0;
+    s->ahr = 0;
 }
 
 // 2^(octQ16 / 65536), returned as a phase increment relative to C4
@@ -114,6 +127,10 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
     s->sens = kSensQ12[ paramClamp( p, kSbSens, 0, 99 ) ];
     s->envSrc = paramClamp( p, kSbEnvSrc, 0, 1 );
+    s->mode = paramClamp( p, kSbMode, 0, 1 );
+    s->threshold = kThresholdQ19[ paramClamp( p, kSbSens, 0, 99 ) ];
+    s->rearm = s->threshold >> 1;               // re-arm 6 dB below the threshold
+    s->holdSamples = kHoldSamples[ paramClamp( p, kSbHold, 0, 99 ) ];
     s->hpfF = kHpfFQ30[ paramClamp( p, kSbHpf, 0, 99 ) ];
     // a Chamberlin SVF's high-pass passband gain is 1 / ( 1 - f*damp/2 ): undo it
     s->hpfGain = ( 1 << 30 ) - (int)( ( (i64)s->hpfF * kHpfDampQ30 ) >> 31 );
@@ -185,6 +202,57 @@ static int softClip( int v )
     return neg ? -y : y;
 }
 
+// Trigger mode: a peak detector on the input; crossing the threshold (after
+// falling 6 dB below it) triggers attack -> hold -> release. Returns Q15.
+static int triggeredEnvelope( SubBassState* s, int level19 )
+{
+    if ( level19 > s->det )
+        s->det = level19;
+    else
+        s->det += (int)( ( (i64)( level19 - s->det ) * kDetReleaseQ31 ) >> 31 );
+
+    if ( s->armed && s->det >= s->threshold )
+    {
+        s->armed = 0;
+        if ( s->stage == kSbStageHold )
+            s->holdCount = 0;                   // another hit: hold again from now
+        else if ( s->stage != kSbStageAttack )
+            s->stage = kSbStageAttack;          // idle or releasing: attack from the current level
+    }
+    else if ( !s->armed && s->det < s->rearm )
+        s->armed = 1;
+
+    switch ( s->stage )
+    {
+        case kSbStageAttack:
+            s->ahr += (int)( ( (i64)( AHR_ATTACK_AIM - s->ahr ) * s->attack ) >> 31 );
+            if ( s->ahr >= AHR_FULL )
+            {
+                s->ahr = AHR_FULL;
+                s->stage = kSbStageHold;
+                s->holdCount = 0;
+            }
+            break;
+        case kSbStageHold:
+            if ( ++s->holdCount >= s->holdSamples )
+                s->stage = kSbStageRelease;
+            break;
+        case kSbStageRelease:
+            // exponential, plus 1 so it reaches zero instead of stalling
+            s->ahr -= (int)( ( (i64)s->ahr * s->release ) >> 31 ) + 1;
+            if ( s->ahr <= 0 )
+            {
+                s->ahr = 0;
+                s->stage = kSbStageIdle;
+            }
+            break;
+        default:
+            break;
+    }
+    int amp = s->ahr >> 15;
+    return amp > 32767 ? 32767 : amp;
+}
+
 void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* outR )
 {
     // Z smoothing
@@ -203,12 +271,18 @@ void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* 
     int eR = s->envSrc ? hR : inR;
     if ( eL < 0 ) eL = -eL;
     if ( eR < 0 ) eR = -eR;
-    int target = clampInt( ( (i64)eL + eR ) << 7, 0, 0x7fffffff );    // (|L|+|R|)/2 at .27
-    int coef = target > s->env ? s->attack : s->release;
-    s->env += (int)( ( (i64)( target - s->env ) * coef ) >> 31 );
+    int amp;
+    if ( !s->mode )
+    {
+        int target = clampInt( ( (i64)eL + eR ) << 7, 0, 0x7fffffff );    // (|L|+|R|)/2 at .27
+        int coef = target > s->env ? s->attack : s->release;
+        s->env += (int)( ( (i64)( target - s->env ) * coef ) >> 31 );
 
-    // amplitude Q15: env / 5 V * sens   (13107 = 2^32 / (80 * 4096))
-    int amp = clampInt( ( (i64)( s->env >> 8 ) * s->sens * 13107 ) >> 32, 0, 32767 );
+        // amplitude Q15: env / 5 V * sens   (13107 = 2^32 / (80 * 4096))
+        amp = clampInt( ( (i64)( s->env >> 8 ) * s->sens * 13107 ) >> 32, 0, 32767 );
+    }
+    else
+        amp = triggeredEnvelope( s, ( eL + eR ) >> 1 );
 
     // oscillator with shape morph
     s->phase += s->phaseInc;

@@ -3,6 +3,10 @@
 //   X, Y : stereo audio in          A, B : X, Y (high-passed) + sub
 //   Z    : V/oct for the sub (knob + jack), 0 V = C4 after 'Cal Z'
 //
+// Mode 0: the sub's level follows the input envelope (Attack, Release, Sens).
+// Mode 1: the input crossing a threshold triggers attack -> hold -> release
+//         (Attack, Hold, Release; parameter 6 becomes Thresh).
+//
 // The DSP itself is in subBassDSP.c; this file connects it to the framework
 // (calibrated I/O, parameters, display, menu).
 
@@ -19,7 +23,8 @@
 
 void subBass()
 {
-    static char const * const paramNames[kSbNumParams] = {
+    // not const: parameter 6 is renamed when Mode changes
+    static char const * paramNames[kSbNumParams] = {
         "Level",
         "Shape",
         "Octave",
@@ -31,6 +36,8 @@ void subBass()
         "HPF",
         "Quant",
         "Drive",
+        "Mode",
+        "Hold",
     };
 
     // min, max, default
@@ -46,6 +53,8 @@ void subBass()
           0, 99,  0,    // HPF
           0,  1,  1,    // Quant
           0, 99,  0,    // Drive
+          0,  1,  0,    // Mode: 0 follow envelope, 1 threshold-triggered attack/hold/release
+          0, 99, 50,    // Hold (trigger mode), 50 = 63 ms
     };
     setParameterRanges( kSbNumParams, ranges );
 
@@ -83,6 +92,7 @@ void subBass()
         {
             controlCountdown = CONTROL_INTERVAL;
             sbControl( &st, (const signed char*)parameters, zcal.m_zeroQ16, zcal.m_semisPerCountQ16 );
+            paramNames[kSbSens] = parameters[kSbMode] ? "Thresh" : "Sens";
         }
 
         SHOW_POT_HANDLING_PARAM_NAME()

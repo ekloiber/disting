@@ -14,7 +14,7 @@ Microchip XC32 compiler toolchain v1.34
 Sub bass (algorithm A1)
 -----------------------
 
-This build has a single algorithm: a sub-bass generator for a stereo signal.
+This build has a single algorithm (13 parameters): a sub-bass generator for a stereo signal.
 
 | Socket | Use |
 |---|---|
@@ -22,8 +22,19 @@ This build has a single algorithm: a sub-bass generator for a stereo signal.
 | Z | V/oct for the sub (the Z knob is added to the jack; keep it fully counter-clockwise) |
 | A, B | X, Y (optionally high-passed) plus the sub, soft-limited above 7 V |
 
-The sub's amplitude follows the input level: an envelope follower on
-(|X| + |Y|) / 2 scales a 5 V peak oscillator. 0 V on Z is C4 before the
+The sub's amplitude comes from the input level, (|X| + |Y|) / 2, in one of
+two modes (parameter 11):
+
+* **Mode 0, follow:** an envelope follower (Attack, Release, Sens) scales a
+  5 V peak oscillator, so the sub tracks the input's dynamics.
+* **Mode 1, trigger:** when the input crosses Thresh, the sub plays an
+  attack -> hold -> release note at full level (Level sets how loud). Hold is
+  counted from the trigger, so the note releases after Hold even if the input
+  stays loud. Another crossing during attack or hold restarts the hold;
+  one during release attacks again from the current level. A crossing needs
+  the input to fall 6 dB below Thresh first (measured with a peak detector
+  that decays in 10 ms), so a steady loud input triggers only once.
+ 0 V on Z is C4 before the
 Octave parameter, so the default (Octave -2) puts 0 V at C2.
 
 | # | Name | Range | Default | Meaning |
@@ -32,16 +43,19 @@ Octave parameter, so the default (Octave -2) puts 0 V at C2.
 | 1 | Shape | 0..99 | 0 | 0 sine, 33 triangle, 66 saw, 99 square (morphs between) |
 | 2 | Octave | -4..0 | -2 | octaves relative to Z |
 | 3 | Fine | -50..50 | 0 | cents |
-| 4 | Attack | 0..99 | 10 | envelope rise, 0.5 ms .. 200 ms |
-| 5 | Release | 0..99 | 30 | envelope fall, 10 ms .. 2 s |
-| 6 | Sens | 0..99 | 50 | envelope gain; 50 = a 5 V envelope gives full sub |
+| 4 | Attack | 0..99 | 10 | envelope rise, 0.5 ms .. 200 ms (time constant; in mode 1 full level arrives after about 1.6x) |
+| 5 | Release | 0..99 | 30 | envelope fall, 10 ms .. 2 s (time constant) |
+| 6 | Sens / Thresh | 0..99 | 50 | mode 0: envelope gain, 50 = a 5 V envelope gives full sub; mode 1: trigger threshold, -60 dB (5 mV) .. 0 dB (5 V), 50 = 164 mV |
 | 7 | Env src | 0..1 | 0 | 0 = follow the input, 1 = follow it after the high-pass |
 | 8 | HPF | 0..99 | 0 | input high-pass, 12 dB/oct; 0 off, 1..99 = 20 Hz .. 300 Hz |
 | 9 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
 | 10 | Drive | 0..99 | 0 | saturation on the sub |
+| 11 | Mode | 0..1 | 0 | 0 = follow the input envelope, 1 = threshold-triggered attack/hold/release |
+| 12 | Hold | 0..99 | 50 | mode 1 only: 0 = none, 1..99 = 2 ms .. 2 s (log), 50 = 63 ms |
 
 Controls are the framework's: turn S to edit, hold S and turn to pick a
 parameter (its number shows, then its name scrolls), press S for the menu.
+Parameter 6's name scrolls as "Sens" or "Thresh" depending on Mode.
 
 ### Calibrating Z (do this once)
 

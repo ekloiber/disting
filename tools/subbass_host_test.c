@@ -20,7 +20,7 @@
 #define VOLT (1 << 19)
 #define CONTROL_INTERVAL 16
 
-static const signed char kDefaults[kSbNumParams] = { 50, 0, -2, 0, 10, 30, 50, 0, 0, 1, 0 };
+static const signed char kDefaults[kSbNumParams] = { 50, 0, -2, 0, 10, 30, 50, 0, 0, 1, 0, 0, 50 };
 
 // calibration used by the tests: 0 V = 300 counts, 128 counts per volt
 #define Z_ZERO_Q16  ( 300 << 16 )
@@ -89,6 +89,93 @@ static Run base( void )
 }
 
 static double noteHz( double semisFromC4 ) { return 261.6255653 * pow( 2, semisFromC4 / 12 ); }
+
+// ---- trigger mode ----------------------------------------------------------
+
+// 1 kHz bursts of `peakV`: burst k is on from onMs[k] for lenMs[k]
+typedef struct { int n; double onMs[4], lenMs[4]; double peakV; } Bursts;
+
+#define TRIG_MAX ( FS * 2 )
+static int ahrTrace[TRIG_MAX];
+
+static int runTrigger( const Bursts* b, signed char* p, double seconds )
+{
+    SubBassState s;
+    sbInit( &s, 300 );
+    sbControl( &s, p, Z_ZERO_Q16, Z_SPC_Q16 );
+    int n = (int)( seconds * FS ), countdown = CONTROL_INTERVAL, i, k;
+    for ( i=0; i<n; ++i )
+    {
+        double ms = i * 1000.0 / FS, a = 0;
+        for ( k=0; k<b->n; ++k )
+            if ( ms >= b->onMs[k] && ms < b->onMs[k] + b->lenMs[k] ) a = b->peakV;
+        int x = (int)lrint( a * VOLT * sin( 2 * M_PI * 1000 * i / FS ) );
+        int oL, oR;
+        sbProcess( &s, x, x, 300, &oL, &oR );
+        if ( --countdown == 0 ) { countdown = CONTROL_INTERVAL; sbControl( &s, p, Z_ZERO_Q16, Z_SPC_Q16 ); }
+        ahrTrace[i] = s.ahr;
+    }
+    return n;
+}
+
+// first sample index >= from where the envelope is at/above (above=1) or below (above=0) frac of full
+static double msWhere( int n, int from, double frac, int above )
+{
+    int i, lim = (int)( frac * ( 1 << 30 ) );
+    for ( i=from; i<n; ++i )
+        if ( above ? ahrTrace[i] >= lim : ahrTrace[i] < lim ) return i * 1000.0 / FS;
+    return -1;
+}
+
+static double peakFrac( int n )
+{
+    int i, m = 0;
+    for ( i=0; i<n; ++i ) if ( ahrTrace[i] > m ) m = ahrTrace[i];
+    return m / (double)( 1 << 30 );
+}
+
+static void triggerTests( void )
+{
+    printf( "-- trigger mode (Thresh 50 = %.0f mV) --\n", 5000 * pow( 10, ( 50 * 60.0 / 99 - 60 ) / 20 ) );
+    signed char p[kSbNumParams];
+    memcpy( p, kDefaults, sizeof p );
+    p[kSbMode] = 1; p[kSbAttack] = 0; p[kSbRelease] = 0;      // 0.5 ms attack, 10 ms release
+
+    Bursts quiet = { 1, { 10 }, { 300 }, 0.1 };
+    int n = runTrigger( &quiet, p, 0.5 );
+    CHECK_RANGE( "100 mV input (below threshold): no note", peakFrac( n ), 0, 0 );
+
+    Bursts one = { 1, { 10 }, { 20 }, 1.0 };
+    n = runTrigger( &one, p, 0.5 );
+    CHECK_RANGE( "1 V burst: envelope reaches full", peakFrac( n ), 0.999, 1.0 );
+    double tFull = msWhere( n, 0, 0.999, 1 );
+    double tRel = msWhere( n, (int)( tFull * FS / 1000 ), 0.999, 0 );
+    CHECK_RANGE( "Hold 50: full for 63.2 ms", tRel - tFull, 62, 64.5 );
+    double tGone = msWhere( n, (int)( tRel * FS / 1000 ), 0.0001, 0 );
+    CHECK_RANGE( "Release 0 (10 ms): down to -80 dB within 120 ms", tGone - tRel, 1, 120 );
+
+    Bursts held = { 1, { 10 }, { 1500 }, 1.0 };
+    n = runTrigger( &held, p, 1.0 );
+    tFull = msWhere( n, 0, 0.999, 1 );
+    tRel = msWhere( n, (int)( tFull * FS / 1000 ), 0.999, 0 );
+    CHECK_RANGE( "One-shot: releases after Hold though input stays loud", tRel - tFull, 62, 64.5 );
+
+    Bursts two = { 2, { 10, 50 }, { 10, 10 }, 1.0 };
+    n = runTrigger( &two, p, 0.5 );
+    tFull = msWhere( n, 0, 0.999, 1 );
+    tRel = msWhere( n, (int)( tFull * FS / 1000 ), 0.999, 0 );
+    CHECK_RANGE( "Second hit 40 ms later restarts Hold: full ~102 ms", tRel - tFull, 100, 105 );
+
+    p[kSbHold] = 0; p[kSbRelease] = 60;                       // long release, no hold
+    Bursts rel = { 2, { 10, 120 }, { 10, 10 }, 1.0 };
+    n = runTrigger( &rel, p, 0.5 );
+    int i, at = (int)( 120.0 * FS / 1000 ), lowest = ahrTrace[at - 1];
+    for ( i=at; i<at + FS / 100; ++i ) if ( ahrTrace[i] < lowest ) lowest = ahrTrace[i];
+    double before = ahrTrace[at - 1] / (double)( 1 << 30 );
+    CHECK_RANGE( "Hit during release: level before retrigger (mid-release)", before, 0.05, 0.95 );
+    CHECK_RANGE( "Hit during release: lowest level after / before (no reset)", lowest / (double)ahrTrace[at - 1], 0.99, 1.0 );
+    CHECK_RANGE( "Hit during release: back to full", peakFrac( n ), 0.999, 1.0 );
+}
 
 int main( void )
 {
@@ -174,6 +261,8 @@ int main( void )
     r = base(); r.inPeakV = 9.5; r.p[kSbLevel] = 99; r.p[kSbSens] = 99;
     res = run( &r, 1.0, 0.5 );
     CHECK_RANGE( "9.5 V input + 5 V sub: output below 9 V", res.outPeakV, 7.0, 9.0 );
+
+    triggerTests();
 
     printf( "%s\n", failures ? "SOME CHECKS FAILED" : "all checks passed" );
     return failures ? 1 : 0;

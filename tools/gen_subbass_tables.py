@@ -40,6 +40,14 @@ def hpf_hz(p):
     return 20.0 * (15.0 ** ((p - 1) / 98.0))   # p=1: 20 Hz .. p=99: 300 Hz
 
 
+def hold_seconds(p):
+    return 0.0 if p == 0 else 0.002 * (1000.0 ** ((p - 1) / 98.0))   # 0, then 2 ms .. 2 s
+
+
+def threshold_volts(p):
+    return 5.0 * 10.0 ** ((p * 60.0 / 99.0 - 60.0) / 20.0)          # -60 dB .. 0 dB re 5 V
+
+
 def one_pole(seconds):
     return 1.0 - math.exp(-1.0 / (seconds * FS))
 
@@ -75,6 +83,17 @@ def main():
         table("kSensQ12", "int",
               [q(2.0 ** ((p - 50) / 12.5), 12) for p in range(100)],
               "envelope gain 2^((p-50)/12.5), Q12; p=50 -> 1.0 (a 5 V envelope gives full sub)"),
+        "",
+        table("kHoldSamples", "int",
+              [int(round(hold_seconds(p) * FS)) for p in range(100)],
+              "trigger mode hold time in samples; p=0 none, 1..99 = 2 ms * 1000^((p-1)/98)"),
+        "",
+        table("kThresholdQ19", "int",
+              [int(round(threshold_volts(p) * (1 << 19))) for p in range(100)],
+              "trigger mode threshold, volts .19; -60 dB .. 0 dB re 5 V"),
+        "",
+        "// trigger mode peak detector release (10 ms), Q31",
+        f"#define kDetReleaseQ31 ({q(one_pole(0.010), 31)})",
         "",
         "// state-variable filter damping 1/Q for Q = 0.7071 (Butterworth), Q30",
         f"#define kHpfDampQ30 ({q(math.sqrt(2.0), 30)})",
