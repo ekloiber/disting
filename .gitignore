@@ -21,11 +21,6 @@
 *.i*86
 *.x86_64
 *.hex
-/hello_disting_mk3/hello_disting_mk3.X/dist/no_bootloader/
-/hello_disting_mk3/hello_disting_mk3.X/build/no_bootloader/
-/hello_disting_mk3/hello_disting_mk3.X/dist/for_bootloader/
-/hello_disting_mk3/hello_disting_mk3.X/build/for_bootloader/
-/hello_disting_mk3/hello_disting_mk3.X/nbproject/private/
 /hello_disting_mk4/nbproject/private/
 /hello_disting_mk4/nbproject/*.mk
 /hello_disting_mk4/nbproject/*.bash
