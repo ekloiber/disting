@@ -62,6 +62,7 @@ void sbInit( SubBassState* s, int zCounts )
     s->holdSamples = 0;
     s->det = 0;
     s->armed = 1;
+    s->gateOpen = 0;
     s->stage = kSbStageIdle;
     s->holdCount = 0;
     s->ahr = 0;
@@ -127,7 +128,7 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
     s->sens = kSensQ12[ paramClamp( p, kSbSens, 0, 99 ) ];
     s->envSrc = paramClamp( p, kSbEnvSrc, 0, 1 );
-    s->mode = paramClamp( p, kSbMode, 0, 1 );
+    s->mode = paramClamp( p, kSbMode, 0, 2 );
     s->threshold = kThresholdQ19[ paramClamp( p, kSbSens, 0, 99 ) ];
     s->rearm = s->threshold >> 1;               // re-arm 6 dB below the threshold
     s->holdSamples = kHoldSamples[ paramClamp( p, kSbHold, 0, 99 ) ];
@@ -253,6 +254,40 @@ static int triggeredEnvelope( SubBassState* s, int level19 )
     return amp > 32767 ? 32767 : amp;
 }
 
+// Gate mode: full level while a peak detector (50 ms decay, steady down to
+// ~40 Hz input) is above the threshold; closes 6 dB below it. Attack and
+// Release shape the edges. Returns Q15.
+static int gatedEnvelope( SubBassState* s, int level19 )
+{
+    if ( level19 > s->det )
+        s->det = level19;
+    else
+        s->det += (int)( ( (i64)( level19 - s->det ) * kDetGateReleaseQ31 ) >> 31 );
+
+    if ( !s->gateOpen && s->det >= s->threshold )
+        s->gateOpen = 1;
+    else if ( s->gateOpen && s->det < s->rearm )
+        s->gateOpen = 0;
+
+    if ( s->gateOpen )
+    {
+        if ( s->ahr < AHR_FULL )
+        {
+            s->ahr += (int)( ( (i64)( AHR_ATTACK_AIM - s->ahr ) * s->attack ) >> 31 );
+            if ( s->ahr > AHR_FULL )
+                s->ahr = AHR_FULL;
+        }
+    }
+    else if ( s->ahr > 0 )
+    {
+        s->ahr -= (int)( ( (i64)s->ahr * s->release ) >> 31 ) + 1;
+        if ( s->ahr < 0 )
+            s->ahr = 0;
+    }
+    int amp = s->ahr >> 15;
+    return amp > 32767 ? 32767 : amp;
+}
+
 void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* outR )
 {
     // Z smoothing
@@ -281,8 +316,10 @@ void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* 
         // amplitude Q15: env / 5 V * sens   (13107 = 2^32 / (80 * 4096))
         amp = clampInt( ( (i64)( s->env >> 8 ) * s->sens * 13107 ) >> 32, 0, 32767 );
     }
-    else
+    else if ( s->mode == 1 )
         amp = triggeredEnvelope( s, ( eL + eR ) >> 1 );
+    else
+        amp = gatedEnvelope( s, ( eL + eR ) >> 1 );
 
     // oscillator with shape morph
     s->phase += s->phaseInc;

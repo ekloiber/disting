@@ -23,7 +23,7 @@ This build has a single algorithm (13 parameters): a sub-bass generator for a st
 | A, B | X, Y (optionally high-passed) plus the sub, soft-limited above 7 V |
 
 The sub's amplitude comes from the input level, (|X| + |Y|) / 2, in one of
-two modes (parameter 11):
+three modes (parameter 11):
 
 * **Mode 0, follow:** an envelope follower (Attack, Release, Sens) scales a
   5 V peak oscillator, so the sub tracks the input's dynamics.
@@ -34,6 +34,12 @@ two modes (parameter 11):
   one during release attacks again from the current level. A crossing needs
   the input to fall 6 dB below Thresh first (measured with a peak detector
   that decays in 10 ms), so a steady loud input triggers only once.
+* **Mode 2, gate:** the sub plays at a fixed level (Level) for as long as the
+  input is above Thresh, and stops when it falls 6 dB below it. Attack and
+  Release fade it in and out; Hold is not used. The detector decays in 50 ms
+  so the gate stays steady on input down to about 40 Hz; the gate closes
+  about 35 ms after the input stops if it was just above Thresh, longer if it
+  was louder (about 120 ms at 20 dB above).
  0 V on Z is C4 before the
 Octave parameter, so the default (Octave -2) puts 0 V at C2.
 
@@ -45,17 +51,17 @@ Octave parameter, so the default (Octave -2) puts 0 V at C2.
 | 3 | Fine | -50..50 | 0 | cents |
 | 4 | Attack | 0..99 | 10 | envelope rise, 0.5 ms .. 200 ms (time constant; in mode 1 full level arrives after about 1.6x) |
 | 5 | Release | 0..99 | 30 | envelope fall, 10 ms .. 2 s (time constant) |
-| 6 | Sens / Thresh | 0..99 | 50 | mode 0: envelope gain, 50 = a 5 V envelope gives full sub; mode 1: trigger threshold, -60 dB (5 mV) .. 0 dB (5 V), 50 = 164 mV |
+| 6 | Sens / Thresh | 0..99 | 50 | mode 0: envelope gain, 50 = a 5 V envelope gives full sub; modes 1 and 2: threshold, -60 dB (5 mV) .. 0 dB (5 V), 50 = 164 mV |
 | 7 | Env src | 0..1 | 0 | 0 = follow the input, 1 = follow it after the high-pass |
 | 8 | HPF | 0..99 | 0 | input high-pass, 12 dB/oct; 0 off, 1..99 = 20 Hz .. 300 Hz |
 | 9 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
 | 10 | Drive | 0..99 | 0 | saturation on the sub |
-| 11 | Mode | 0..1 | 0 | 0 = follow the input envelope, 1 = threshold-triggered attack/hold/release |
+| 11 | Mode | 0..2 | 0 | 0 = follow the input envelope, 1 = threshold-triggered attack/hold/release, 2 = gate (fixed level while above threshold) |
 | 12 | Hold | 0..99 | 50 | mode 1 only: 0 = none, 1..99 = 2 ms .. 2 s (log), 50 = 63 ms |
 
 Controls are the framework's: turn S to edit, hold S and turn to pick a
 parameter (its number shows, then its name scrolls), press S for the menu.
-Parameter 6's name scrolls as "Sens" or "Thresh" depending on Mode.
+Parameter 6's name scrolls as "Sens" (mode 0) or "Thresh" (modes 1 and 2).
 
 ### Calibrating Z (do this once)
 

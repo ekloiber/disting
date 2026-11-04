@@ -6,6 +6,8 @@
 // Mode 0: the sub's level follows the input envelope (Attack, Release, Sens).
 // Mode 1: the input crossing a threshold triggers attack -> hold -> release
 //         (Attack, Hold, Release; parameter 6 becomes Thresh).
+// Mode 2: gate: fixed level while the input is above the threshold
+//         (Attack, Release, Thresh; Hold unused).
 //
 // The DSP itself is in subBassDSP.c; this file connects it to the framework
 // (calibrated I/O, parameters, display, menu).
@@ -53,7 +55,7 @@ void subBass()
           0, 99,  0,    // HPF
           0,  1,  1,    // Quant
           0, 99,  0,    // Drive
-          0,  1,  0,    // Mode: 0 follow envelope, 1 threshold-triggered attack/hold/release
+          0,  2,  0,    // Mode: 0 follow envelope, 1 triggered attack/hold/release, 2 gate
           0, 99, 50,    // Hold (trigger mode), 50 = 63 ms
     };
     setParameterRanges( kSbNumParams, ranges );

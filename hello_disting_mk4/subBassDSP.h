@@ -17,12 +17,13 @@ enum {
     kSbAttack,      // 0..99   0.5 ms .. 200 ms
     kSbRelease,     // 0..99   10 ms .. 2 s
     kSbSens,        // 0..99   follow mode: envelope gain, 50 = unity
-                    //         trigger mode: threshold, -60 dB .. 0 dB re 5 V
+                    //         trigger / gate modes: threshold, -60 dB .. 0 dB re 5 V
     kSbEnvSrc,      // 0..1    0 = full input, 1 = after the high-pass
     kSbHpf,         // 0..99   0 = off, 1..99 = 20 Hz .. 300 Hz
     kSbQuant,       // 0..1    snap pitch to semitones
     kSbDrive,       // 0..99   saturation on the sub
-    kSbMode,        // 0..1    0 = follow the input envelope, 1 = threshold-triggered attack/hold/release
+    kSbMode,        // 0..2    0 = follow the input envelope, 1 = threshold-triggered attack/hold/release,
+                    //         2 = gate: fixed level while the input is above threshold
     kSbHold,        // 0..99   trigger mode hold: 0 none, 1..99 = 2 ms .. 2 s
     kSbNumParams
 };
@@ -49,6 +50,7 @@ typedef struct {
     int holdSamples;
     int det;                        // peak detector, .19 volts
     int armed;                      // detector has fallen below rearm since the last trigger
+    int gateOpen;                   // gate mode
     int stage;                      // see kSbStage* in subBassDSP.c
     int holdCount;
     int ahr;                        // envelope, Q30 (1 << 30 = full)

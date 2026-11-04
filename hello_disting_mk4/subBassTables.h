@@ -183,6 +183,9 @@ static const int kThresholdQ19[100] = {
 // trigger mode peak detector release (10 ms), Q31
 #define kDetReleaseQ31 (2861404)
 
+// gate mode peak detector release (50 ms): bridges waveform gaps down to ~40 Hz, Q31
+#define kDetGateReleaseQ31 (572586)
+
 // state-variable filter damping 1/Q for Q = 0.7071 (Butterworth), Q30
 #define kHpfDampQ30 (1518500250)
 

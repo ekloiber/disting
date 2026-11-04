@@ -96,6 +96,7 @@ static double noteHz( double semisFromC4 ) { return 261.6255653 * pow( 2, semisF
 typedef struct { int n; double onMs[4], lenMs[4]; double peakV; } Bursts;
 
 #define TRIG_MAX ( FS * 2 )
+static double burstHz = 1000;
 static int ahrTrace[TRIG_MAX];
 
 static int runTrigger( const Bursts* b, signed char* p, double seconds )
@@ -109,7 +110,7 @@ static int runTrigger( const Bursts* b, signed char* p, double seconds )
         double ms = i * 1000.0 / FS, a = 0;
         for ( k=0; k<b->n; ++k )
             if ( ms >= b->onMs[k] && ms < b->onMs[k] + b->lenMs[k] ) a = b->peakV;
-        int x = (int)lrint( a * VOLT * sin( 2 * M_PI * 1000 * i / FS ) );
+        int x = (int)lrint( a * VOLT * sin( 2 * M_PI * burstHz * i / FS ) );
         int oL, oR;
         sbProcess( &s, x, x, 300, &oL, &oR );
         if ( --countdown == 0 ) { countdown = CONTROL_INTERVAL; sbControl( &s, p, Z_ZERO_Q16, Z_SPC_Q16 ); }
@@ -175,6 +176,49 @@ static void triggerTests( void )
     CHECK_RANGE( "Hit during release: level before retrigger (mid-release)", before, 0.05, 0.95 );
     CHECK_RANGE( "Hit during release: lowest level after / before (no reset)", lowest / (double)ahrTrace[at - 1], 0.99, 1.0 );
     CHECK_RANGE( "Hit during release: back to full", peakFrac( n ), 0.999, 1.0 );
+
+    // probe: one-shot with a low-pitched input (detector decays 10 ms)
+    memcpy( p, kDefaults, sizeof p );
+    p[kSbMode] = 1; p[kSbAttack] = 0; p[kSbRelease] = 0;
+    burstHz = 50;
+    n = runTrigger( &held, p, 1.0 );
+    tFull = msWhere( n, 0, 0.999, 1 );
+    tRel = msWhere( n, (int)( tFull * FS / 1000 ), 0.999, 0 );
+    printf( "info trigger mode, 50 Hz input held 1.5 s: full for %.1f ms (one-shot would be 63.2)\n", tRel < 0 ? 1000.0 - tFull : tRel - tFull );
+    burstHz = 1000;
+}
+
+static void gateTests( void )
+{
+    printf( "-- gate mode (Thresh 50 = 164 mV, closes at 82 mV) --\n" );
+    signed char p[kSbNumParams];
+    memcpy( p, kDefaults, sizeof p );
+    p[kSbMode] = 2; p[kSbAttack] = 0; p[kSbRelease] = 0;
+
+    Bursts quiet = { 1, { 10 }, { 300 }, 0.1 };
+    int n = runTrigger( &quiet, p, 0.5 );
+    CHECK_RANGE( "100 mV input (below threshold): stays closed", peakFrac( n ), 0, 0 );
+
+    Bursts on = { 1, { 10 }, { 500 }, 1.0 };
+    n = runTrigger( &on, p, 1.0 );
+    double tFull = msWhere( n, 0, 0.999, 1 );
+    double tRel = msWhere( n, (int)( tFull * FS / 1000 ), 0.999, 0 );
+    CHECK_RANGE( "1 V for 500 ms: full the whole time (ms)", tRel - tFull, 499, 700 );
+    CHECK_RANGE( "Closes after the input stops: delay (ms)", tRel - 510, 80, 160 );
+
+    int i, lo = 1 << 30;
+    burstHz = 40;
+    n = runTrigger( &on, p, 1.0 );
+    tFull = msWhere( n, 0, 0.999, 1 );
+    for ( i=(int)( ( tFull + 1 ) * FS / 1000 ); i<(int)( 505.0 * FS / 1000 ); ++i ) if ( ahrTrace[i] < lo ) lo = ahrTrace[i];
+    CHECK_RANGE( "40 Hz input: no flicker (lowest level while on)", lo / (double)( 1 << 30 ), 0.999, 1.0 );
+    burstHz = 1000;
+
+    Bursts soft = { 1, { 10 }, { 300 }, 0.4 }, loud = { 1, { 10 }, { 300 }, 4.0 };
+    n = runTrigger( &soft, p, 0.5 );
+    double a = peakFrac( n );
+    n = runTrigger( &loud, p, 0.5 );
+    CHECK_RANGE( "Static level: 4 V input / 0.4 V input", peakFrac( n ) / a, 0.999, 1.001 );
 }
 
 int main( void )
@@ -263,6 +307,7 @@ int main( void )
     CHECK_RANGE( "9.5 V input + 5 V sub: output below 9 V", res.outPeakV, 7.0, 9.0 );
 
     triggerTests();
+    gateTests();
 
     printf( "%s\n", failures ? "SOME CHECKS FAILED" : "all checks passed" );
     return failures ? 1 : 0;
