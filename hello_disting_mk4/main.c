@@ -16,7 +16,16 @@
 #include "HardwareProfile.h"
 #include "MDD File System/FSIO.h"
 
+// The bootloader only jumps to the application (at 0xBD008000) if this word is present.
 const int magic __attribute__((address(0xBD008370))) = 0xbadabeef;
+
+// Header required by bootloader b2 (firmware 4.15+), which installs 'disting4.bin'.
+// The .bin is a flat flash image starting at the address in word 1; the first two words
+// of the file must be { 0xBADABEEF, <start address> }. 0x9D007000 is the start of
+// exception_mem in the _for_bootloader linker script (unused below EBASE+0x180), and is
+// the same start address used by Expert Sleepers' own b2 bootloader upgrader.
+// See tools/hex2disting4bin.py and README.md.
+const unsigned int b2Header[2] __attribute__((address(0x9D007000))) = { 0xbadabeef, 0x9D007000 };
 
 int dummy;
 
