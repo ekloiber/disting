@@ -8,6 +8,7 @@
 #include "settings.h"
 #include "presets.h"
 #include "algorithmNames.h"
+#include "zcal.h"
 
 static const short font[95][3] = {
 #include "font.h"
@@ -26,7 +27,7 @@ static const int dimPatterns[16] = { 0x00010001, 0x01010101, 0x08410841, 0x11111
                                      0x556D556D, 0x5B6D5B6D, 0xB6DDB6DD, 0xDDDDDDDD,
                                      0xEF7DEF7D, 0xFDFDFDFD, 0xFFFDFFFD, 0xFFFFFFFF };
 
-static char const * const kVersionString = "v1.0.0";
+static char const * const kVersionString = "Sub bass v0.1";
 
 static const short matrixRows[7] = { BIT_10, BIT_7, BIT_8, BIT_9, BIT_0, BIT_4, BIT_1 };
 static const short matrixCols[5] = { BIT_10, BIT_13, BIT_2, BIT_3, BIT_4 };
@@ -54,6 +55,7 @@ enum {
     kMenuLoad,
     kMenuTestSD,
     kMenuSettings,
+    kMenuCalZ,
     kNumMenuL,
 };
 
@@ -63,6 +65,7 @@ char const * const menuLStrings[kNumMenuL] = {
     "Load",
     "Test SD",
     "Settings",
+    "Cal Z",
 };
 
 enum { 
@@ -359,7 +362,7 @@ int menuTick()
                         activeMenu = kMenuChooseAlgorithm;
                         menuValue = selector;
                         menuMin = 0;
-                        menuMax = 127;
+                        menuMax = kNumAlgorithms - 1;
                         setChooseAlgorithmString();
                         break;
                     case kMenuSave:
@@ -372,6 +375,9 @@ int menuTick()
                         break;
                     case kMenuTestSD:
                         testSDCard();
+                        break;
+                    case kMenuCalZ:
+                        calibrateZ();
                         break;
                     case kMenuSettings:
                         if ( menuR >= 1 && menuR <= kNumSettings )

@@ -11,6 +11,68 @@ installed or symlinked to 'microchip_solutions_v2013-06-15' alongside the hello_
 
 Microchip XC32 compiler toolchain v1.34
 
+Sub bass (algorithm A1)
+-----------------------
+
+This build has a single algorithm: a sub-bass generator for a stereo signal.
+
+| Socket | Use |
+|---|---|
+| X, Y | stereo audio in |
+| Z | V/oct for the sub (the Z knob is added to the jack; keep it fully counter-clockwise) |
+| A, B | X, Y (optionally high-passed) plus the sub, soft-limited above 7 V |
+
+The sub's amplitude follows the input level: an envelope follower on
+(|X| + |Y|) / 2 scales a 5 V peak oscillator. 0 V on Z is C4 before the
+Octave parameter, so the default (Octave -2) puts 0 V at C2.
+
+| # | Name | Range | Default | Meaning |
+|---|---|---|---|---|
+| 0 | Level | 0..99 | 50 | sub level; 99 = 5 V peak at full envelope |
+| 1 | Shape | 0..99 | 0 | 0 sine, 33 triangle, 66 saw, 99 square (morphs between) |
+| 2 | Octave | -4..0 | -2 | octaves relative to Z |
+| 3 | Fine | -50..50 | 0 | cents |
+| 4 | Attack | 0..99 | 10 | envelope rise, 0.5 ms .. 200 ms |
+| 5 | Release | 0..99 | 30 | envelope fall, 10 ms .. 2 s |
+| 6 | Sens | 0..99 | 50 | envelope gain; 50 = a 5 V envelope gives full sub |
+| 7 | Env src | 0..1 | 0 | 0 = follow the input, 1 = follow it after the high-pass |
+| 8 | HPF | 0..99 | 0 | input high-pass, 12 dB/oct; 0 off, 1..99 = 20 Hz .. 300 Hz |
+| 9 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
+| 10 | Drive | 0..99 | 0 | saturation on the sub |
+
+Controls are the framework's: turn S to edit, hold S and turn to pick a
+parameter (its number shows, then its name scrolls), press S for the menu.
+
+### Calibrating Z (do this once)
+
+The Z knob and jack are summed into one 10-bit reading that the factory
+calibration does not cover. Until you calibrate, the display says
+"Z not calibrated" and pitch uses a rough nominal scale.
+
+1. Turn the Z knob fully counter-clockwise.
+2. Press S, turn to "Cal Z", press S.
+3. Patch exactly 1 V into Z (e.g. a quantiser or a known-good CV source) and press S.
+4. Patch exactly 3 V and press S. The display shows "Z calibrated".
+
+Press Z at either prompt to cancel. "Cal failed" means a reading was at the
+ADC limit or the two readings were too close. The calibration is stored in the
+settings flash page (offset 0x100), which the bootloader never writes, so it
+survives reinstalling this firmware. Going back to the stock firmware may
+overwrite it; recalibrate if so.
+
+### Testing the DSP without hardware
+
+`tools/subbass_host_test.c` runs the DSP core (`subBassDSP.c`) on a PC and
+checks pitch, levels, envelope, filter response and limiting. Build commands
+are at the top of the file. `tools/gen_subbass_tables.py` regenerates
+`subBassTables.h`.
+
+### Checking CPU load on the hardware
+
+The framework drives RC9 low while waiting for the next sample (`IDLE()`).
+On a scope, the low time is the spare CPU per sample at 75 kHz (13.3 us total).
+If it reaches zero, raise `CONTROL_INTERVAL` in `subBass.c` first.
+
 Installing via the SD card (bootloader b2, firmware 4.15+)
 ----------------------------------------------------------
 

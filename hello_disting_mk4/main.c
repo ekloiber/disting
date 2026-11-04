@@ -319,9 +319,14 @@ int main(int argc, char** argv) {
 
         potMIDIOverride = 0;
         
+        // only A1 exists: anything else stored in a preset or favourite maps to it
+        if ( selector >= kNumAlgorithms && selector < 112 )
+            selector = 0;
         int sel = selector;
         if ( sel >= 112 )
             sel = settings.m_favourites[ sel - 112 ];
+        if ( sel >= kNumAlgorithms )    // before the SD check: no SD algorithms in this build
+            sel = 0;
         if ( sel >= 64 && sel < 88 )
         {
             BYTE sdPresent = EnterSDMode();
@@ -335,34 +340,8 @@ int main(int argc, char** argv) {
         }
         actuallyRunningSelector = sel;
         
-        static algorithm* const algorithms[] = {
-/*  0 -  4 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/*  4 -  7 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/*  8 - 11 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 12 - 15 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 16 - 19 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 20 - 23 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 24 - 27 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 28 - 31 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 32 - 35 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 36 - 39 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 40 - 43 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 44 - 47 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 48 - 51 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 52 - 55 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 56 - 59 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 60 - 63 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 64 - 67 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 68 - 71 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 72 - 75 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 76 - 79 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 80 - 83 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 84 - 87 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 88 - 91 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 92 - 95 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 96 - 99 */       sumDifference, sumDifference, sumDifference, sumDifference,
-/* 100 - 103 */     sumDifference, sumDifference, sumDifference, sumDifference,
-/* 104 - 107 */     sumDifference, sumDifference, sumDifference, sumDifference,
+        static algorithm* const algorithms[kNumAlgorithms] = {
+/*  0 A1 */         subBass,
         };
         if ( sel >= sizeof algorithms/sizeof algorithms[0] )
             sel = 0;

@@ -2,7 +2,7 @@
 #ifndef _PRESETS_H    /* Guard against multiple inclusion */
 #define _PRESETS_H
 
-#define kMaxParameters (8)
+#define kMaxParameters (14)        // Sub bass uses 11; was 8 + 6 unused bytes
 
 #define kNumPresets (64)
 
@@ -12,8 +12,6 @@ typedef struct
     BYTE        m_selector;
    
     char        m_parameters[kMaxParameters];
-    
-    BYTE        m_unused[6];
 } Preset;
 
 extern char pendingParameterLoad;

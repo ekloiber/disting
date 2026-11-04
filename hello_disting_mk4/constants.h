@@ -39,6 +39,10 @@ typedef void (algorithm)(void);
 
 // algorithms
 extern void sumDifference(void);
+extern void subBass(void);
+
+// number of entries in the algorithm table (main.c); A1 = Sub bass only
+#define kNumAlgorithms (1)
 
 // display
 #define ALL_COLUMNS ( BIT_2 | BIT_3 | BIT_4 | BIT_10 | BIT_13 )    

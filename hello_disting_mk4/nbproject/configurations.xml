@@ -13,6 +13,9 @@
       <itemPath>pragma_configs.h</itemPath>
       <itemPath>bcdTable.h</itemPath>
       <itemPath>constants.h</itemPath>
+      <itemPath>subBassDSP.h</itemPath>
+      <itemPath>subBassTables.h</itemPath>
+      <itemPath>zcal.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -34,6 +37,9 @@
       <itemPath>favourites.c</itemPath>
       <itemPath>algorithms.c</itemPath>
       <itemPath>main.c</itemPath>
+      <itemPath>subBass.c</itemPath>
+      <itemPath>subBassDSP.c</itemPath>
+      <itemPath>zcal.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
