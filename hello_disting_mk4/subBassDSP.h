@@ -10,21 +10,21 @@
 #define SUBBASS_DSP_H
 
 enum {
-    kSbLevel = 0,   // 0..99   sub level, 99 = 5 V peak
+    kSbMode = 0,    // 0..3    see kSbMode* below
     kSbShape,       // 0..99   sine -> triangle -> saw -> square
+    kSbDrive,       // 0..99   saturation on the sub
+    kSbLevel,       // 0..99   sub level, 99 = 5 V peak
     kSbOctave,      // -4..0   octaves relative to Z
     kSbFine,        // -50..50 cents
-    kSbAttack,      // 0..99   0.5 ms .. 200 ms
-    kSbRelease,     // 0..99   10 ms .. 2 s
+    kSbQuant,       // 0..1    snap pitch to semitones
+    kSbHpf,         // 0..99   0 = off, 1..99 = 20 Hz .. 300 Hz
+    kSbEnvSrc,      // 0..1    0 = full input, 1 = after the high-pass
     kSbSens,        // 0..99   follow mode: envelope gain, 50 = unity
                     //         trigger / gate modes: threshold, -60 dB .. 0 dB re 5 V
                     //         constant mode: unused
-    kSbEnvSrc,      // 0..1    0 = full input, 1 = after the high-pass
-    kSbHpf,         // 0..99   0 = off, 1..99 = 20 Hz .. 300 Hz
-    kSbQuant,       // 0..1    snap pitch to semitones
-    kSbDrive,       // 0..99   saturation on the sub
-    kSbMode,        // 0..3    see kSbMode* below
+    kSbAttack,      // 0..99   0.5 ms .. 200 ms
     kSbHold,        // 0..99   trigger mode hold: 0 none, 1..99 = 2 ms .. 2 s
+    kSbRelease,     // 0..99   10 ms .. 2 s
     kSbNumParams
 };
 

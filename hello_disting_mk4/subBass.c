@@ -6,7 +6,7 @@
 // Mode 0: constant tone at Level, no envelope (ignores the input level).
 // Mode 1: the sub's level follows the input envelope (Attack, Release, Sens).
 // Mode 2: the input crossing a threshold triggers attack -> hold -> release
-//         (Attack, Hold, Release; parameter 6 becomes Thresh).
+//         (Attack, Hold, Release; Sens becomes Thresh).
 // Mode 3: gate: fixed level while the input is above the threshold
 //         (Attack, Release, Thresh; Hold unused).
 //
@@ -26,38 +26,40 @@
 
 void subBass()
 {
-    // not const: parameter 6 is renamed when Mode changes
+    // Display order is set by the enum in subBassDSP.h; entries here are
+    // placed by name, so reordering the enum needs no change below.
+    // Not const: Sens is renamed Thresh in trigger and gate modes.
     static char const * paramNames[kSbNumParams] = {
-        "Level",
-        "Shape",
-        "Octave",
-        "Fine",
-        "Attack",
-        "Release",
-        "Sens",
-        "Env src",
-        "HPF",
-        "Quant",
-        "Drive",
-        "Mode",
-        "Hold",
+        [kSbMode]    = "Mode",
+        [kSbShape]   = "Shape",
+        [kSbDrive]   = "Drive",
+        [kSbLevel]   = "Level",
+        [kSbOctave]  = "Octave",
+        [kSbFine]    = "Fine",
+        [kSbQuant]   = "Quant",
+        [kSbHpf]     = "HPF",
+        [kSbEnvSrc]  = "Env src",
+        [kSbSens]    = "Sens",
+        [kSbAttack]  = "Attack",
+        [kSbHold]    = "Hold",
+        [kSbRelease] = "Release",
     };
 
     // min, max, default
     static const char ranges[ 3 * kSbNumParams ] = {
-          0, 99, 50,    // Level
-          0, 99,  0,    // Shape
-         -4,  0, -2,    // Octave
-        -50, 50,  0,    // Fine
-          0, 99, 10,    // Attack
-          0, 99, 30,    // Release
-          0, 99, 50,    // Sens
-          0,  1,  0,    // Env src
-          0, 99,  0,    // HPF
-          0,  1,  1,    // Quant
-          0, 99,  0,    // Drive
-          0,  3,  0,    // Mode: 0 constant, 1 follow, 2 trigger (attack/hold/release), 3 gate
-          0, 99, 50,    // Hold (trigger mode), 50 = 63 ms
+        [3*kSbMode]    =   0,  3,  0,   // 0 constant, 1 follow, 2 trigger (attack/hold/release), 3 gate
+        [3*kSbShape]   =   0, 99,  0,
+        [3*kSbDrive]   =   0, 99,  0,
+        [3*kSbLevel]   =   0, 99, 50,
+        [3*kSbOctave]  =  -4,  0, -2,
+        [3*kSbFine]    = -50, 50,  0,
+        [3*kSbQuant]   =   0,  1,  1,
+        [3*kSbHpf]     =   0, 99,  0,
+        [3*kSbEnvSrc]  =   0,  1,  0,
+        [3*kSbSens]    =   0, 99, 50,
+        [3*kSbAttack]  =   0, 99, 10,
+        [3*kSbHold]    =   0, 99, 50,   // trigger mode, 50 = 63 ms
+        [3*kSbRelease] =   0, 99, 30,
     };
     setParameterRanges( kSbNumParams, ranges );
 

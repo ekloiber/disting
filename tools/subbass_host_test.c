@@ -20,8 +20,12 @@
 #define VOLT (1 << 19)
 #define CONTROL_INTERVAL 16
 
-// firmware defaults, except Mode = follow (1): most checks below exercise the envelope follower
-static const signed char kDefaults[kSbNumParams] = { 50, 0, -2, 0, 10, 30, 50, 0, 0, 1, 0, kSbModeFollow, 50 };
+// firmware defaults, except Mode = follow: most checks below exercise the envelope follower
+static const signed char kDefaults[kSbNumParams] = {
+    [kSbMode] = kSbModeFollow, [kSbShape] = 0, [kSbDrive] = 0, [kSbLevel] = 50,
+    [kSbOctave] = -2, [kSbFine] = 0, [kSbQuant] = 1, [kSbHpf] = 0, [kSbEnvSrc] = 0,
+    [kSbSens] = 50, [kSbAttack] = 10, [kSbHold] = 50, [kSbRelease] = 30,
+};
 
 // calibration used by the tests: 0 V = 300 counts, 128 counts per volt
 #define Z_ZERO_Q16  ( 300 << 16 )
