@@ -30,8 +30,8 @@ enum {
 
 // values of the Mode parameter
 enum {
-    kSbModeFollow = 0,      // sub level follows the input envelope (Attack, Release, Sens)
-    kSbModeConstant,        // constant tone at Level, no envelope; ignores the input level
+    kSbModeConstant = 0,    // constant tone at Level, no envelope; ignores the input level
+    kSbModeFollow,          // sub level follows the input envelope (Attack, Release, Sens)
     kSbModeTrigger,         // crossing Thresh triggers attack -> hold -> release
     kSbModeGate,            // fixed level while the input is above Thresh
     kSbNumModes

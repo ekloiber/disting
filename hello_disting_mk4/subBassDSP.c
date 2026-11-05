@@ -56,7 +56,7 @@ void sbInit( SubBassState* s, int zCounts )
     s->driveMix = 0;
     s->levelVolts = 0;
     s->envSrc = 0;
-    s->mode = kSbModeFollow;
+    s->mode = kSbModeConstant;
     s->threshold = kThresholdQ19[50];
     s->rearm = kThresholdQ19[50] >> 1;
     s->holdSamples = 0;
