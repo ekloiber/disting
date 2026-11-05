@@ -56,7 +56,7 @@ void sbInit( SubBassState* s, int zCounts )
     s->driveMix = 0;
     s->levelVolts = 0;
     s->envSrc = 0;
-    s->mode = 0;
+    s->mode = kSbModeFollow;
     s->threshold = kThresholdQ19[50];
     s->rearm = kThresholdQ19[50] >> 1;
     s->holdSamples = 0;
@@ -128,7 +128,7 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
     s->sens = kSensQ12[ paramClamp( p, kSbSens, 0, 99 ) ];
     s->envSrc = paramClamp( p, kSbEnvSrc, 0, 1 );
-    s->mode = paramClamp( p, kSbMode, 0, 2 );
+    s->mode = paramClamp( p, kSbMode, 0, kSbNumModes - 1 );
     s->threshold = kThresholdQ19[ paramClamp( p, kSbSens, 0, 99 ) ];
     s->rearm = s->threshold >> 1;               // re-arm 6 dB below the threshold
     s->holdSamples = kHoldSamples[ paramClamp( p, kSbHold, 0, 99 ) ];
@@ -307,7 +307,7 @@ void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* 
     if ( eL < 0 ) eL = -eL;
     if ( eR < 0 ) eR = -eR;
     int amp;
-    if ( !s->mode )
+    if ( s->mode == kSbModeFollow )
     {
         int target = clampInt( ( (i64)eL + eR ) << 7, 0, 0x7fffffff );    // (|L|+|R|)/2 at .27
         int coef = target > s->env ? s->attack : s->release;
@@ -316,7 +316,9 @@ void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* 
         // amplitude Q15: env / 5 V * sens   (13107 = 2^32 / (80 * 4096))
         amp = clampInt( ( (i64)( s->env >> 8 ) * s->sens * 13107 ) >> 32, 0, 32767 );
     }
-    else if ( s->mode == 1 )
+    else if ( s->mode == kSbModeConstant )
+        amp = 32767;
+    else if ( s->mode == kSbModeTrigger )
         amp = triggeredEnvelope( s, ( eL + eR ) >> 1 );
     else
         amp = gatedEnvelope( s, ( eL + eR ) >> 1 );

@@ -18,14 +18,23 @@ enum {
     kSbRelease,     // 0..99   10 ms .. 2 s
     kSbSens,        // 0..99   follow mode: envelope gain, 50 = unity
                     //         trigger / gate modes: threshold, -60 dB .. 0 dB re 5 V
+                    //         constant mode: unused
     kSbEnvSrc,      // 0..1    0 = full input, 1 = after the high-pass
     kSbHpf,         // 0..99   0 = off, 1..99 = 20 Hz .. 300 Hz
     kSbQuant,       // 0..1    snap pitch to semitones
     kSbDrive,       // 0..99   saturation on the sub
-    kSbMode,        // 0..2    0 = follow the input envelope, 1 = threshold-triggered attack/hold/release,
-                    //         2 = gate: fixed level while the input is above threshold
+    kSbMode,        // 0..3    see kSbMode* below
     kSbHold,        // 0..99   trigger mode hold: 0 none, 1..99 = 2 ms .. 2 s
     kSbNumParams
+};
+
+// values of the Mode parameter
+enum {
+    kSbModeFollow = 0,      // sub level follows the input envelope (Attack, Release, Sens)
+    kSbModeConstant,        // constant tone at Level, no envelope; ignores the input level
+    kSbModeTrigger,         // crossing Thresh triggers attack -> hold -> release
+    kSbModeGate,            // fixed level while the input is above Thresh
+    kSbNumModes
 };
 
 typedef struct {

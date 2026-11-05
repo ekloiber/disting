@@ -140,7 +140,7 @@ static void triggerTests( void )
     printf( "-- trigger mode (Thresh 50 = %.0f mV) --\n", 5000 * pow( 10, ( 50 * 60.0 / 99 - 60 ) / 20 ) );
     signed char p[kSbNumParams];
     memcpy( p, kDefaults, sizeof p );
-    p[kSbMode] = 1; p[kSbAttack] = 0; p[kSbRelease] = 0;      // 0.5 ms attack, 10 ms release
+    p[kSbMode] = kSbModeTrigger; p[kSbAttack] = 0; p[kSbRelease] = 0;      // 0.5 ms attack, 10 ms release
 
     Bursts quiet = { 1, { 10 }, { 300 }, 0.1 };
     int n = runTrigger( &quiet, p, 0.5 );
@@ -179,7 +179,7 @@ static void triggerTests( void )
 
     // probe: one-shot with a low-pitched input (detector decays 10 ms)
     memcpy( p, kDefaults, sizeof p );
-    p[kSbMode] = 1; p[kSbAttack] = 0; p[kSbRelease] = 0;
+    p[kSbMode] = kSbModeTrigger; p[kSbAttack] = 0; p[kSbRelease] = 0;
     burstHz = 50;
     n = runTrigger( &held, p, 1.0 );
     tFull = msWhere( n, 0, 0.999, 1 );
@@ -193,7 +193,7 @@ static void gateTests( void )
     printf( "-- gate mode (Thresh 50 = 164 mV, closes at 82 mV) --\n" );
     signed char p[kSbNumParams];
     memcpy( p, kDefaults, sizeof p );
-    p[kSbMode] = 2; p[kSbAttack] = 0; p[kSbRelease] = 0;
+    p[kSbMode] = kSbModeGate; p[kSbAttack] = 0; p[kSbRelease] = 0;
 
     Bursts quiet = { 1, { 10 }, { 300 }, 0.1 };
     int n = runTrigger( &quiet, p, 0.5 );
@@ -300,6 +300,18 @@ int main( void )
         res = run( &r, 2.0, 1.0 );
         CHECK_RANGE( hp[k].what, res.outRmsLeft / ( 1 / sqrt( 2 ) ), hp[k].lo, hp[k].hi );
     }
+
+    printf( "-- constant mode --\n" );
+    r = base(); r.p[kSbMode] = kSbModeConstant; r.p[kSbLevel] = 99; r.inPeakV = 0;
+    res = run( &r, 0.5, 0.3 );
+    CHECK_RANGE( "Silent input: sub still plays at 5 V peak", res.subPeakV, 4.95, 5.05 );
+    CHECK_RANGE( "Silent input: pitch still follows Z (C2)", res.subFreq, 65.2, 65.6 );
+    r.inPeakV = 3; r.p[kSbSens] = 0;
+    res = run( &r, 0.5, 0.3 );
+    CHECK_RANGE( "3 V input, Sens 0: level unchanged (no envelope)", res.subPeakV, 4.95, 5.05 );
+    r.p[kSbLevel] = 50;
+    res = run( &r, 0.5, 0.3 );
+    CHECK_RANGE( "Level 50: about half (2.5 V)", res.subPeakV, 2.45, 2.55 );
 
     printf( "-- output limiting --\n" );
     r = base(); r.inPeakV = 9.5; r.p[kSbLevel] = 99; r.p[kSbSens] = 99;
