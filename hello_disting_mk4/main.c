@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
         actuallyRunningSelector = sel;
         
         static algorithm* const algorithms[kNumAlgorithms] = {
-/*  0 A1 */         subBass,
+/*  0 A1 */         subBass,      // Sub voice
         };
         if ( sel >= sizeof algorithms/sizeof algorithms[0] )
             sel = 0;

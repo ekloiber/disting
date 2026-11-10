@@ -27,7 +27,7 @@ static const int dimPatterns[16] = { 0x00010001, 0x01010101, 0x08410841, 0x11111
                                      0x556D556D, 0x5B6D5B6D, 0xB6DDB6DD, 0xDDDDDDDD,
                                      0xEF7DEF7D, 0xFDFDFDFD, 0xFFFDFFFD, 0xFFFFFFFF };
 
-static char const * const kVersionString = "Sub bass v0.1";
+static char const * const kVersionString = "Sub voice v0.1";
 
 static const short matrixRows[7] = { BIT_10, BIT_7, BIT_8, BIT_9, BIT_0, BIT_4, BIT_1 };
 static const short matrixCols[5] = { BIT_10, BIT_13, BIT_2, BIT_3, BIT_4 };

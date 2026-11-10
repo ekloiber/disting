@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate hello_disting_mk4/subBassTables.h: fixed-point lookup tables for the
-Sub bass algorithm. Run from the repository root:
+Sub voice algorithm. Run from the repository root:
 
     python3 tools/gen_subbass_tables.py
 
@@ -36,18 +36,6 @@ def release_seconds(p):
     return 0.010 * (200.0 ** (p / 99.0))       # 10 ms .. 2 s
 
 
-def hpf_hz(p):
-    return 20.0 * (15.0 ** ((p - 1) / 98.0))   # p=1: 20 Hz .. p=99: 300 Hz
-
-
-def hold_seconds(p):
-    return 0.0 if p == 0 else 0.002 * (1000.0 ** ((p - 1) / 98.0))   # 0, then 2 ms .. 2 s
-
-
-def threshold_volts(p):
-    return 5.0 * 10.0 ** ((p * 60.0 / 99.0 - 60.0) / 20.0)          # -60 dB .. 0 dB re 5 V
-
-
 def one_pole(seconds):
     return 1.0 - math.exp(-1.0 / (seconds * FS))
 
@@ -75,31 +63,6 @@ def main():
         table("kReleaseQ31", "int",
               [q(one_pole(release_seconds(p)), 31) for p in range(100)],
               "envelope release coefficient, Q31; t = 10 ms * 200^(p/99)"),
-        "",
-        table("kHpfFQ30", "int",
-              [0] + [q(2.0 * math.sin(math.pi * hpf_hz(p) / FS), 30) for p in range(1, 100)],
-              "state-variable HPF frequency coefficient 2*sin(pi*fc/fs), Q30; p=0 bypass; fc = 20 Hz * 15^((p-1)/98)"),
-        "",
-        table("kSensQ12", "int",
-              [q(2.0 ** ((p - 50) / 12.5), 12) for p in range(100)],
-              "envelope gain 2^((p-50)/12.5), Q12; p=50 -> 1.0 (a 5 V envelope gives full sub)"),
-        "",
-        table("kHoldSamples", "int",
-              [int(round(hold_seconds(p) * FS)) for p in range(100)],
-              "trigger mode hold time in samples; p=0 none, 1..99 = 2 ms * 1000^((p-1)/98)"),
-        "",
-        table("kThresholdQ19", "int",
-              [int(round(threshold_volts(p) * (1 << 19))) for p in range(100)],
-              "trigger mode threshold, volts .19; -60 dB .. 0 dB re 5 V"),
-        "",
-        "// trigger mode peak detector release (10 ms), Q31",
-        f"#define kDetReleaseQ31 ({q(one_pole(0.010), 31)})",
-        "",
-        "// gate mode peak detector release (50 ms): bridges waveform gaps down to ~40 Hz, Q31",
-        f"#define kDetGateReleaseQ31 ({q(one_pole(0.050), 31)})",
-        "",
-        "// state-variable filter damping 1/Q for Q = 0.7071 (Butterworth), Q30",
-        f"#define kHpfDampQ30 ({q(math.sqrt(2.0), 30)})",
         "",
         "// phase increment for C4 (261.6256 Hz) with a 32-bit phase accumulator",
         f"#define kC4PhaseInc ({int(round(261.6255653 / FS * 2 ** 32))})",

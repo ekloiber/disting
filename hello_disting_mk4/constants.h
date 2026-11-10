@@ -41,7 +41,7 @@ typedef void (algorithm)(void);
 extern void sumDifference(void);
 extern void subBass(void);
 
-// number of entries in the algorithm table (main.c); A1 = Sub bass only
+// number of entries in the algorithm table (main.c); A1 = Sub voice only
 #define kNumAlgorithms (1)
 
 // display

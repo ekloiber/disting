@@ -2,7 +2,7 @@
 #ifndef _PRESETS_H    /* Guard against multiple inclusion */
 #define _PRESETS_H
 
-#define kMaxParameters (14)        // Sub bass uses 13; was 8 + 6 unused bytes
+#define kMaxParameters (14)        // Sub voice uses 8; was 8 + 6 unused bytes
 
 #define kNumPresets (64)
 

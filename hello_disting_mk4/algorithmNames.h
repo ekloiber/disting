@@ -1,7 +1,7 @@
 #define kMenuAlgorithmNameMaxChars (32)
 #define kNumAlgorithmNames (128)
 char const * const algorithmNames[kNumAlgorithmNames] = {
-"Sub bass",
+"Sub voice",
 "Adder",
 "Adder",
 "Adder",

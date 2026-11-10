@@ -1,4 +1,4 @@
-// Sub bass DSP core. See subBassDSP.h for units.
+// Sub voice DSP core. See subBassDSP.h for jacks and units.
 
 #include "subBassDSP.h"
 #include "subBassTables.h"
@@ -6,16 +6,17 @@
 typedef long long i64;
 
 #define VOLT            ( 1 << 19 )
-#define SUB_PEAK        ( 5 * VOLT )            // Level 99, full envelope
-#define CLIP_KNEE       ( 7 * VOLT )            // soft clip starts here...
-#define CLIP_SPAN       ( 2 * VOLT )            // ...and approaches knee + span (9 V)
+#define SUB_PEAK        ( 5 * VOLT )            // Level 99, full envelope and velocity
+#define ENV_OUT_PEAK    ( 5 * VOLT )            // B at full envelope
+#define GATE_ON         ( VOLT )                // X above 1 V opens the gate...
+#define GATE_OFF        ( VOLT / 2 )            // ...below 0.5 V closes it
+#define VEL_FULL        ( 5 * VOLT )            // Y at 5 V = full velocity
+#define VEL_SLEW_SHIFT  ( 7 )                   // ~1.7 ms velocity smoothing
 #define MAX_PHASE_INC   ( 0x10000000u )         // fs/16, about 4.7 kHz
 #define QUANT_HYST      ( 0xA000 )              // 0.625 semitone, Q16
 #define Z_SMOOTH_SHIFT  ( 8 )                   // ~3.4 ms smoothing at 75 kHz
-#define AHR_FULL        ( 1 << 30 )
-#define AHR_ATTACK_AIM  ( AHR_FULL + ( AHR_FULL >> 2 ) )   // attack aims past full so it arrives
-
-enum { kSbStageIdle, kSbStageAttack, kSbStageHold, kSbStageRelease };
+#define ENV_FULL        ( 1 << 30 )
+#define ENV_ATTACK_AIM  ( ENV_FULL + ( ENV_FULL >> 2 ) )   // attack aims past full so it arrives
 
 static int clampInt( i64 v, int lo, int hi )
 {
@@ -34,38 +35,21 @@ static int paramClamp( const signed char* p, int i, int lo, int hi )
 
 void sbInit( SubBassState* s, int zCounts )
 {
-    int i;
-    for ( i=0; i<2; ++i )
-    {
-        s->hpfLow[i] = 0;
-        s->hpfBand[i] = 0;
-    }
-    s->env = 0;
     s->phase = 0;
     s->zSmooth = zCounts << 16;
+    s->gate = 0;
+    s->env = 0;
+    s->velTarget = 0;
+    s->vel = 0;
     s->phaseInc = 0;
     s->curSemi = 0;
     s->quantPrimed = 0;
-    s->hpfF = 0;
-    s->hpfGain = 1 << 30;
     s->attack = kAttackQ31[0];
     s->release = kReleaseQ31[0];
-    s->sens = kSensQ12[50];
     s->shapePos = 0;
     s->driveGain = 4096;
     s->driveMix = 0;
     s->levelVolts = 0;
-    s->envSrc = 0;
-    s->mode = kSbModeConstant;
-    s->threshold = kThresholdQ19[50];
-    s->rearm = kThresholdQ19[50] >> 1;
-    s->holdSamples = 0;
-    s->det = 0;
-    s->armed = 1;
-    s->gateOpen = 0;
-    s->stage = kSbStageIdle;
-    s->holdCount = 0;
-    s->ahr = 0;
 }
 
 // 2^(octQ16 / 65536), returned as a phase increment relative to C4
@@ -115,9 +99,7 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
     int octQ16 = (int)( ( (i64)semis * 357913941 ) >> 32 );
     s->phaseInc = phaseIncForOctaves( octQ16 );
 
-    int level = paramClamp( p, kSbLevel, 0, 99 );
-    s->levelVolts = level * ( SUB_PEAK / 99 );
-
+    s->levelVolts = paramClamp( p, kSbLevel, 0, 99 ) * ( SUB_PEAK / 99 );
     s->shapePos = paramClamp( p, kSbShape, 0, 99 ) * ( 3 * 65536 ) / 99;
 
     int drive = paramClamp( p, kSbDrive, 0, 99 );
@@ -126,27 +108,6 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
 
     s->attack = kAttackQ31[ paramClamp( p, kSbAttack, 0, 99 ) ];
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
-    s->sens = kSensQ12[ paramClamp( p, kSbSens, 0, 99 ) ];
-    s->envSrc = paramClamp( p, kSbEnvSrc, 0, 1 );
-    s->mode = paramClamp( p, kSbMode, 0, kSbNumModes - 1 );
-    s->threshold = kThresholdQ19[ paramClamp( p, kSbSens, 0, 99 ) ];
-    s->rearm = s->threshold >> 1;               // re-arm 6 dB below the threshold
-    s->holdSamples = kHoldSamples[ paramClamp( p, kSbHold, 0, 99 ) ];
-    s->hpfF = kHpfFQ30[ paramClamp( p, kSbHpf, 0, 99 ) ];
-    // a Chamberlin SVF's high-pass passband gain is 1 / ( 1 - f*damp/2 ): undo it
-    s->hpfGain = ( 1 << 30 ) - (int)( ( (i64)s->hpfF * kHpfDampQ30 ) >> 31 );
-}
-
-// Chamberlin state-variable high-pass, 12 dB/oct, Butterworth damping
-static int highPass( SubBassState* s, int ch, int x19 )
-{
-    int x = x19 * 256;                          // .27 (multiply: x19 may be negative)
-    int f = s->hpfF;
-    s->hpfLow[ch] += (int)( ( (i64)f * s->hpfBand[ch] ) >> 30 );
-    int high = clampInt( (i64)x - s->hpfLow[ch] - ( ( (i64)kHpfDampQ30 * s->hpfBand[ch] ) >> 30 ),
-                         -0x7fffffff, 0x7fffffff );
-    s->hpfBand[ch] += (int)( ( (i64)f * high ) >> 30 );
-    return (int)( ( (i64)high * s->hpfGain ) >> 38 );     // .27 * Q30 -> .19
 }
 
 static int sineAt( unsigned int ph )
@@ -189,139 +150,46 @@ static int saturate( int u )
     return ( ( 3 * u ) >> 1 ) - (int)( ( (i64)u * u * u ) >> 31 );
 }
 
-static int softClip( int v )
-{
-    int neg = v < 0;
-    int a = neg ? -v : v;
-    if ( a <= CLIP_KNEE )
-        return v;
-    // knee + span * t / ( t + span ), computed in 2^-8 V steps to stay in 32 bits
-    int t = ( a - CLIP_KNEE ) >> 8;
-    int span = CLIP_SPAN >> 8;
-    if ( t > 0x3fffff ) t = 0x3fffff;
-    int y = CLIP_KNEE + ( ( ( span * t ) / ( t + span ) ) << 8 );
-    return neg ? -y : y;
-}
-
-// Trigger mode: a peak detector on the input; crossing the threshold (after
-// falling 6 dB below it) triggers attack -> hold -> release. Returns Q15.
-static int triggeredEnvelope( SubBassState* s, int level19 )
-{
-    if ( level19 > s->det )
-        s->det = level19;
-    else
-        s->det += (int)( ( (i64)( level19 - s->det ) * kDetReleaseQ31 ) >> 31 );
-
-    if ( s->armed && s->det >= s->threshold )
-    {
-        s->armed = 0;
-        if ( s->stage == kSbStageHold )
-            s->holdCount = 0;                   // another hit: hold again from now
-        else if ( s->stage != kSbStageAttack )
-            s->stage = kSbStageAttack;          // idle or releasing: attack from the current level
-    }
-    else if ( !s->armed && s->det < s->rearm )
-        s->armed = 1;
-
-    switch ( s->stage )
-    {
-        case kSbStageAttack:
-            s->ahr += (int)( ( (i64)( AHR_ATTACK_AIM - s->ahr ) * s->attack ) >> 31 );
-            if ( s->ahr >= AHR_FULL )
-            {
-                s->ahr = AHR_FULL;
-                s->stage = kSbStageHold;
-                s->holdCount = 0;
-            }
-            break;
-        case kSbStageHold:
-            if ( ++s->holdCount >= s->holdSamples )
-                s->stage = kSbStageRelease;
-            break;
-        case kSbStageRelease:
-            // exponential, plus 1 so it reaches zero instead of stalling
-            s->ahr -= (int)( ( (i64)s->ahr * s->release ) >> 31 ) + 1;
-            if ( s->ahr <= 0 )
-            {
-                s->ahr = 0;
-                s->stage = kSbStageIdle;
-            }
-            break;
-        default:
-            break;
-    }
-    int amp = s->ahr >> 15;
-    return amp > 32767 ? 32767 : amp;
-}
-
-// Gate mode: full level while a peak detector (50 ms decay, steady down to
-// ~40 Hz input) is above the threshold; closes 6 dB below it. Attack and
-// Release shape the edges. Returns Q15.
-static int gatedEnvelope( SubBassState* s, int level19 )
-{
-    if ( level19 > s->det )
-        s->det = level19;
-    else
-        s->det += (int)( ( (i64)( level19 - s->det ) * kDetGateReleaseQ31 ) >> 31 );
-
-    if ( !s->gateOpen && s->det >= s->threshold )
-        s->gateOpen = 1;
-    else if ( s->gateOpen && s->det < s->rearm )
-        s->gateOpen = 0;
-
-    if ( s->gateOpen )
-    {
-        if ( s->ahr < AHR_FULL )
-        {
-            s->ahr += (int)( ( (i64)( AHR_ATTACK_AIM - s->ahr ) * s->attack ) >> 31 );
-            if ( s->ahr > AHR_FULL )
-                s->ahr = AHR_FULL;
-        }
-    }
-    else if ( s->ahr > 0 )
-    {
-        s->ahr -= (int)( ( (i64)s->ahr * s->release ) >> 31 ) + 1;
-        if ( s->ahr < 0 )
-            s->ahr = 0;
-    }
-    int amp = s->ahr >> 15;
-    return amp > 32767 ? 32767 : amp;
-}
-
-void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* outR )
+void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, int* outB )
 {
     // Z smoothing
     s->zSmooth += ( ( zCounts << 16 ) - s->zSmooth ) >> Z_SMOOTH_SHIFT;
 
-    // input high-pass
-    int hL = inL, hR = inR;
-    if ( s->hpfF )
+    // gate with hysteresis; velocity is sampled when it opens
+    if ( !s->gate && gateIn > GATE_ON )
     {
-        hL = highPass( s, 0, inL );
-        hR = highPass( s, 1, inR );
+        s->gate = 1;
+        s->velTarget = clampInt( ( (i64)velIn * 32767 ) / VEL_FULL, 0, 32767 );
+    }
+    else if ( s->gate && gateIn < GATE_OFF )
+        s->gate = 0;
+    {
+        int d = s->velTarget - s->vel;
+        if ( d > -( 1 << VEL_SLEW_SHIFT ) && d < ( 1 << VEL_SLEW_SHIFT ) )
+            s->vel = s->velTarget;              // last step: the shift would stall short of it
+        else
+            s->vel += d / ( 1 << VEL_SLEW_SHIFT );
     }
 
-    // envelope follower on |L| + |R|
-    int eL = s->envSrc ? hL : inL;
-    int eR = s->envSrc ? hR : inR;
-    if ( eL < 0 ) eL = -eL;
-    if ( eR < 0 ) eR = -eR;
-    int amp;
-    if ( s->mode == kSbModeFollow )
+    // attack / sustain at full / release; a new gate attacks from the current level
+    if ( s->gate )
     {
-        int target = clampInt( ( (i64)eL + eR ) << 7, 0, 0x7fffffff );    // (|L|+|R|)/2 at .27
-        int coef = target > s->env ? s->attack : s->release;
-        s->env += (int)( ( (i64)( target - s->env ) * coef ) >> 31 );
-
-        // amplitude Q15: env / 5 V * sens   (13107 = 2^32 / (80 * 4096))
-        amp = clampInt( ( (i64)( s->env >> 8 ) * s->sens * 13107 ) >> 32, 0, 32767 );
+        if ( s->env < ENV_FULL )
+        {
+            s->env += (int)( ( (i64)( ENV_ATTACK_AIM - s->env ) * s->attack ) >> 31 );
+            if ( s->env > ENV_FULL )
+                s->env = ENV_FULL;
+        }
     }
-    else if ( s->mode == kSbModeConstant )
-        amp = 32767;
-    else if ( s->mode == kSbModeTrigger )
-        amp = triggeredEnvelope( s, ( eL + eR ) >> 1 );
-    else
-        amp = gatedEnvelope( s, ( eL + eR ) >> 1 );
+    else if ( s->env > 0 )
+    {
+        // exponential, plus 1 so it reaches zero instead of stalling
+        s->env -= (int)( ( (i64)s->env * s->release ) >> 31 ) + 1;
+        if ( s->env < 0 )
+            s->env = 0;
+    }
+    int envQ15 = s->env >> 15;
+    if ( envQ15 > 32767 ) envQ15 = 32767;
 
     // oscillator with shape morph
     s->phase += s->phaseInc;
@@ -344,8 +212,7 @@ void sbProcess( SubBassState* s, int inL, int inR, int zCounts, int* outL, int* 
         w += (int)( ( (i64)( sat - w ) * s->driveMix ) >> 15 );
     }
 
-    int sub = (int)( ( (i64)( ( w * amp ) >> 15 ) * s->levelVolts ) >> 15 );
-
-    *outL = softClip( hL + sub );
-    *outR = softClip( hR + sub );
+    int amp = ( envQ15 * s->vel ) >> 15;
+    *outA = (int)( ( (i64)( ( w * amp ) >> 15 ) * s->levelVolts ) >> 15 );
+    *outB = (int)( ( (i64)s->env * ENV_OUT_PEAK ) >> 30 );
 }

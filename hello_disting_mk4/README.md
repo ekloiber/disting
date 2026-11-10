@@ -11,59 +11,39 @@ installed or symlinked to 'microchip_solutions_v2013-06-15' alongside the hello_
 
 Microchip XC32 compiler toolchain v1.34
 
-Sub bass (algorithm A1)
------------------------
+Sub voice (algorithm A1)
+------------------------
 
-This build has a single algorithm (13 parameters): a sub-bass generator for a stereo signal.
+This build has a single algorithm: a gated sub-bass voice.
 
 | Socket | Use |
 |---|---|
-| X, Y | stereo audio in |
-| Z | V/oct for the sub (the Z knob is added to the jack; keep it fully counter-clockwise) |
-| A, B | X, Y (optionally high-passed) plus the sub, soft-limited above 7 V |
+| X | gate: high above 1 V, low below 0.5 V |
+| Y | velocity: 0..5 V, sampled when the gate opens (0 V or less = silent, above 5 V = full) |
+| Z | V/oct pitch (the Z knob is added to the jack; keep it fully counter-clockwise) |
+| A | sub audio; Level 99 = 5 V peak at full velocity |
+| B | envelope CV, 0..5 V (not scaled by velocity or Level) |
 
-In modes 1, 2 and 3 the sub's amplitude comes from the input level,
-(|X| + |Y|) / 2. There are four modes (parameter 0):
-
-* **Mode 0, constant:** a steady tone at Level, with no envelope; the input
-  level has no effect (the input still passes through to A/B).
-* **Mode 1, follow:** an envelope follower (Attack, Release, Sens) scales a
-  5 V peak oscillator, so the sub tracks the input's dynamics.
-* **Mode 2, trigger:** when the input crosses Thresh, the sub plays an
-  attack -> hold -> release note at full level (Level sets how loud). Hold is
-  counted from the trigger, so the note releases after Hold even if the input
-  stays loud. Another crossing during attack or hold restarts the hold;
-  one during release attacks again from the current level. A crossing needs
-  the input to fall 6 dB below Thresh first (measured with a peak detector
-  that decays in 10 ms), so a steady loud input triggers only once.
-* **Mode 3, gate:** the sub plays at a fixed level (Level) for as long as the
-  input is above Thresh, and stops when it falls 6 dB below it. Attack and
-  Release fade it in and out; Hold is not used. The detector decays in 50 ms
-  so the gate stays steady on input down to about 40 Hz; the gate closes
-  about 35 ms after the input stops if it was just above Thresh, longer if it
-  was louder (about 120 ms at 20 dB above).
- 0 V on Z is C4 before the
-Octave parameter, so the default (Octave -2) puts 0 V at C2.
+While the gate is high the envelope rises (Attack) to full and stays there;
+when the gate goes low it falls (Release). A new gate during the release
+attacks again from the current level, so there is no click. Velocity is
+read once per note; changing Y during a note has no effect until the next
+gate. 0 V on Z is C4 before the Octave parameter, so the default
+(Octave -2) puts 0 V at C2.
 
 | # | Name | Range | Default | Meaning |
 |---|---|---|---|---|
-| 0 | Mode | 0..3 | 0 | 0 = constant tone, 1 = follow the input envelope, 2 = threshold-triggered attack/hold/release, 3 = gate (fixed level while above threshold) |
-| 1 | Shape | 0..99 | 0 | 0 sine, 33 triangle, 66 saw, 99 square (morphs between) |
-| 2 | Drive | 0..99 | 0 | saturation on the sub |
-| 3 | Level | 0..99 | 50 | sub level; 99 = 5 V peak at full envelope |
-| 4 | Octave | -4..0 | -2 | octaves relative to Z |
-| 5 | Fine | -50..50 | 0 | cents |
-| 6 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
-| 7 | HPF | 0..99 | 0 | input high-pass, 12 dB/oct; 0 off, 1..99 = 20 Hz .. 300 Hz |
-| 8 | Env src | 0..1 | 0 | 0 = follow the input, 1 = follow it after the high-pass |
-| 9 | Sens / Thresh | 0..99 | 50 | mode 1: envelope gain, 50 = a 5 V envelope gives full sub; modes 2 and 3: threshold, -60 dB (5 mV) .. 0 dB (5 V), 50 = 164 mV; mode 0: unused |
-| 10 | Attack | 0..99 | 10 | envelope rise, 0.5 ms .. 200 ms (time constant; in modes 2 and 3 full level arrives after about 1.6x) |
-| 11 | Hold | 0..99 | 50 | mode 2 only: 0 = none, 1..99 = 2 ms .. 2 s (log), 50 = 63 ms |
-| 12 | Release | 0..99 | 30 | envelope fall, 10 ms .. 2 s (time constant) |
+| 0 | Shape | 0..99 | 0 | 0 sine, 33 triangle, 66 saw, 99 square (morphs between) |
+| 1 | Drive | 0..99 | 0 | saturation on the sub |
+| 2 | Level | 0..99 | 50 | sub level; 99 = 5 V peak at full envelope and velocity |
+| 3 | Octave | -4..0 | -2 | octaves relative to Z |
+| 4 | Fine | -50..50 | 0 | cents |
+| 5 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
+| 6 | Attack | 0..99 | 10 | 0.5 ms .. 200 ms (time constant; full level arrives after about 1.6x) |
+| 7 | Release | 0..99 | 30 | 10 ms .. 2 s (time constant) |
 
 Controls are the framework's: turn S to edit, hold S and turn to pick a
 parameter (its number shows, then its name scrolls), press S for the menu.
-Parameter 9's name scrolls as "Sens" (modes 0 and 1) or "Thresh" (modes 2 and 3).
 
 ### Calibrating Z (do this once)
 
@@ -85,7 +65,7 @@ overwrite it; recalibrate if so.
 ### Testing the DSP without hardware
 
 `tools/subbass_host_test.c` runs the DSP core (`subBassDSP.c`) on a PC and
-checks pitch, levels, envelope, filter response and limiting. Build commands
+checks pitch, gate thresholds, envelope, velocity and levels. Build commands
 are at the top of the file. `tools/gen_subbass_tables.py` regenerates
 `subBassTables.h`.
 
