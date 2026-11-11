@@ -7,6 +7,9 @@
 //   A : sub, Level 99 = 5 V peak at full envelope and velocity
 //   B : envelope, 0..5 V (not scaled by velocity or Level)
 //
+// A gate that arrives after the previous note has released (below -60 dB)
+// restarts the waveform at phase 0; during a release it keeps running.
+//
 // Units
 //   voltages : volts with 19 fractional bits (1 V = 0x80000), as used by the framework
 //   Z        : raw 10-bit ADC counts (0..1023)

@@ -26,7 +26,13 @@ This build has a single algorithm: a gated sub-bass voice.
 
 While the gate is high the envelope rises (Attack) to full and stays there;
 when the gate goes low it falls (Release). A new gate during the release
-attacks again from the current level, so there is no click. Velocity is
+attacks again from the current level, so there is no click.
+
+Each note starts the waveform at phase 0 (a zero crossing for sine,
+triangle and saw; square starts at full and is smoothed by Attack), so every
+note begins identically. This only happens when the previous note has
+released below -60 dB: if it is still sounding, the waveform keeps running,
+because jumping it back to zero would click. Velocity is
 read once per note; changing Y during a note has no effect until the next
 gate. 0 V on Z is C4 before the Octave parameter, so the default
 (Octave -2) puts 0 V at C2.

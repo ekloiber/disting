@@ -17,6 +17,7 @@ typedef long long i64;
 #define Z_SMOOTH_SHIFT  ( 8 )                   // ~3.4 ms smoothing at 75 kHz
 #define ENV_FULL        ( 1 << 30 )
 #define ENV_ATTACK_AIM  ( ENV_FULL + ( ENV_FULL >> 2 ) )   // attack aims past full so it arrives
+#define ENV_SILENT      ( ENV_FULL / 1000 )     // -60 dB: below this a new gate restarts the waveform
 
 static int clampInt( i64 v, int lo, int hi )
 {
@@ -160,6 +161,14 @@ void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, 
     {
         s->gate = 1;
         s->velTarget = clampInt( ( (i64)velIn * 32767 ) / VEL_FULL, 0, 32767 );
+        if ( s->env < ENV_SILENT )
+        {
+            // previous note has died away: start the waveform at phase 0 (a zero
+            // crossing for sine, triangle and saw) so every note begins the same way.
+            // If it is still sounding, keep the waveform running: a jump would click.
+            s->phase = 0;
+            s->vel = s->velTarget;
+        }
     }
     else if ( s->gate && gateIn < GATE_OFF )
         s->gate = 0;
@@ -191,8 +200,7 @@ void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, 
     int envQ15 = s->env >> 15;
     if ( envQ15 > 32767 ) envQ15 = 32767;
 
-    // oscillator with shape morph
-    s->phase += s->phaseInc;
+    // oscillator with shape morph (phase advances after use, so a reset note starts exactly at 0)
     int seg = s->shapePos >> 16;
     int w;
     if ( seg >= 3 )
@@ -215,4 +223,5 @@ void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, 
     int amp = ( envQ15 * s->vel ) >> 15;
     *outA = (int)( ( (i64)( ( w * amp ) >> 15 ) * s->levelVolts ) >> 15 );
     *outB = (int)( ( (i64)s->env * ENV_OUT_PEAK ) >> 30 );
+    s->phase += s->phaseInc;
 }

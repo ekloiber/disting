@@ -12,6 +12,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "subBassDSP.h"
 
@@ -48,6 +49,7 @@ typedef struct {
 
 #define MAX_SAMPLES ( FS * 2 )
 static int traceA[MAX_SAMPLES], traceB[MAX_SAMPLES], traceEnv[MAX_SAMPLES];
+static unsigned int tracePhase[MAX_SAMPLES];        // phase used for sample i
 
 static int run( const Run* r, double seconds )
 {
@@ -61,6 +63,7 @@ static int run( const Run* r, double seconds )
         for ( k=0; k<r->n; ++k )
             if ( ms >= r->atMs[k] ) { g = r->gateV[k]; v = r->velV[k]; }
         int a, b;
+        tracePhase[i] = s.phase;
         sbProcess( &s, (int)lrint( g * VOLT ), (int)lrint( v * VOLT ), r->zCounts, &a, &b );
         if ( --countdown == 0 ) { countdown = CONTROL_INTERVAL; sbControl( &s, r->p, Z_ZERO_Q16, Z_SPC_Q16 ); }
         traceA[i] = a; traceB[i] = b; traceEnv[i] = s.env;
@@ -197,6 +200,48 @@ int main( void )
     r = gateRun( 5, 1 ); r.n = 3; r.atMs[2] = 200; r.gateV[2] = 5; r.velV[2] = 5;
     n = run( &r, 0.5 );
     CHECK_RANGE( "Velocity sampled at gate: Y 1 V -> 5 V mid-note, A stays 1 V", peakA( 300, 500 ), 0.95, 1.05 );
+
+    printf( "-- phase reset on gate --\n" );
+    {
+        static int noteA[FS / 20];
+        int len = FS / 20, i, maxDiff = 0, g0, g1;
+        // same note started at two different moments: identical output
+        r = gateRun( 5, 5 ); r.p[kSbShape] = 0;
+        n = run( &r, 0.2 );
+        g0 = idx( 10 ) + 1;     // first sample at/after 10 ms
+        while ( g0 > 0 && traceEnv[g0 - 1] > 0 ) g0--;
+        memcpy( noteA, &traceA[g0], sizeof noteA );
+        CHECK_RANGE( "First sample of a note is a zero crossing (V)", traceA[g0] / (double)VOLT, 0, 0 );
+        r.atMs[1] = 13.37;
+        n = run( &r, 0.2 );
+        g1 = idx( 13.37 ) + 1;
+        while ( g1 > 0 && traceEnv[g1 - 1] > 0 ) g1--;
+        for ( i=0; i<len; ++i ) { int d = abs( traceA[g1 + i] - noteA[i] ); if ( d > maxDiff ) maxDiff = d; }
+        CHECK_RANGE( "Notes started at different times are identical (max diff, V)", maxDiff / (double)VOLT, 0, 0 );
+
+        // second note after a full release: also identical, and starts at phase 0
+        r = gateRun( 5, 5 ); r.p[kSbRelease] = 0;
+        r.n = 4; r.atMs[2] = 110; r.gateV[2] = 0; r.velV[2] = 5; r.atMs[3] = 300.37; r.gateV[3] = 5; r.velV[3] = 5;
+        n = run( &r, 0.5 );
+        g1 = idx( 300.37 ) + 1;                     // the gate sample (its phase is reset inside)
+        unsigned int inc0 = tracePhase[idx( 50 ) + 1] - tracePhase[idx( 50 )];
+        CHECK_RANGE( "After full release: envelope was silent before the gate", traceEnv[g1 - 1], 0, 0 );
+        CHECK_RANGE( "After full release: phase after the first sample = one step", (double)( tracePhase[g1 + 1] - inc0 ), 0, 0 );
+
+        // retrigger mid-release: phase keeps running, no jump in A
+        r = gateRun( 5, 5 ); r.p[kSbRelease] = 60;
+        r.n = 4; r.atMs[2] = 100; r.gateV[2] = 0; r.velV[2] = 5; r.atMs[3] = 250; r.gateV[3] = 5; r.velV[3] = 5;
+        n = run( &r, 0.4 );
+        unsigned int inc = tracePhase[idx( 50 ) + 1] - tracePhase[idx( 50 )];
+        int resets = 0, during = 0, g = idx( 250 ) + 1;
+        for ( i=idx( 240 ); i<idx( 260 ); ++i ) if ( tracePhase[i] - tracePhase[i-1] != inc ) resets++;
+        for ( i=g + 1; i<g + FS / 1000; ++i ) { int d = abs( traceA[i] - traceA[i-1] ); if ( d > during ) during = d; }
+        CHECK_RANGE( "Retrigger mid-release: phase not reset (discontinuities)", resets, 0, 0 );
+        // an exponential attack's first step is its largest, so allow 10% over the steps after it;
+        // a phase reset here would jump by up to the current level (about 2.7 V)
+        CHECK_RANGE( "Retrigger mid-release: step at gate / largest attack step after", abs( traceA[g] - traceA[g-1] ) / (double)during, 0, 1.1 );
+        CHECK_RANGE( "Retrigger mid-release: step at gate (V, a click would be ~1-3 V)", abs( traceA[g] - traceA[g-1] ) / (double)VOLT, 0, 0.1 );
+    }
 
     printf( "-- shape, drive, level --\n" );
     int shapes[4] = { 0, 33, 66, 99 }, k;
