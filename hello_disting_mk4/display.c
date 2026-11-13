@@ -8,7 +8,6 @@
 #include "settings.h"
 #include "presets.h"
 #include "algorithmNames.h"
-#include "zcal.h"
 
 static const short font[95][3] = {
 #include "font.h"
@@ -54,7 +53,6 @@ enum {
     kMenuSave,
     kMenuLoad,
     kMenuSettings,
-    kMenuCalZ,
     kNumMenuL,
 };
 
@@ -63,7 +61,6 @@ char const * const menuLStrings[kNumMenuL] = {
     "Save",
     "Load",
     "Settings",
-    "Cal Z",
 };
 
 enum { 
@@ -381,9 +378,6 @@ int menuTick()
                         menuMin = 0;
                         menuMax = kNumPresets-1;
                         displayMode = kDisplayModeMenuValue;
-                        break;
-                    case kMenuCalZ:
-                        calibrateZ();
                         break;
                     case kMenuSettings:
                         if ( menuR >= 1 && menuR <= kNumSettingsMenuItems )

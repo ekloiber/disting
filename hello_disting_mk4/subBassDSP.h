@@ -1,9 +1,10 @@
 // Sub voice DSP core: hardware-independent, fixed point, no libm.
 // Compiled into the firmware and into tools/subbass_host_test.c.
 //
-//   X : gate (high above 1 V, low below 0.5 V)
-//   Y : velocity, 0..5 V, sampled when the gate opens (only if Velocity = 1)
-//   Z : V/oct pitch (knob + jack)
+//   X : V/oct pitch (factory-calibrated 24-bit input), 0 V = C4 before Octave
+//   Y : gate (high above 1 V, low below 0.5 V)
+//   Z : velocity (knob + jack): knob fully CCW = silent, fully CW = full;
+//       applies continuously, like a VCA
 //   A : sub, Level 99 = 5 V peak at full envelope and velocity
 //   B : envelope, 0..5 V (not scaled by velocity or Level)
 //
@@ -27,13 +28,13 @@ enum {
     kSbQuant,       // 0..1    snap pitch to semitones
     kSbAttack,      // 0..99   0.5 ms .. 200 ms (time constant)
     kSbRelease,     // 0..99   10 ms .. 2 s (time constant)
-    kSbVelocity,    // 0..1    0 = ignore Y (always full), 1 = Y sets the note level
     kSbNumParams
 };
 
 typedef struct {
     // per-sample state
     unsigned int phase;
+    int pitchSmooth;                // X, volts .19
     int zSmooth;                    // ADC counts, 16 fractional bits
     int gate;                       // X is high
     int env;                        // Q30, 1 << 30 = full
@@ -46,17 +47,16 @@ typedef struct {
     int shapePos;                   // 0 .. 3<<16
     int driveGain, driveMix;        // Q12 gain, Q15 dry/wet
     int levelVolts;                 // .19 volts at full envelope and velocity
-    int useVelocity;                // read Y at each gate
 } SubBassState;
 
-// zCounts: current Z reading, used to start the smoother without a glide
-void sbInit( SubBassState* s, int zCounts );
+// pitchIn: current X (volts .19) and zCounts: current Z, used to start the
+// smoothers without a glide
+void sbInit( SubBassState* s, int pitchIn, int zCounts );
 
-// Call at control rate (every few samples). zZeroQ16 = ADC counts at 0 V
-// (16 fractional bits), zSemisPerCountQ16 = semitones per ADC count (Q16).
-void sbControl( SubBassState* s, const signed char* params, int zZeroQ16, int zSemisPerCountQ16 );
+// Call at control rate (every few samples).
+void sbControl( SubBassState* s, const signed char* params );
 
-// Call once per sample. gateIn, velIn: X and Y in volts .19.
-void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, int* outB );
+// Call once per sample. pitchIn, gateIn: X and Y in volts .19; zCounts: Z ADC.
+void sbProcess( SubBassState* s, int pitchIn, int gateIn, int zCounts, int* outA, int* outB );
 
 #endif // SUBBASS_DSP_H

@@ -1,9 +1,8 @@
 // A1: Sub voice
 //
-//   X : gate (high above 1 V, low below 0.5 V)
-//   Y : velocity, 0..5 V, sampled when the gate opens (Velocity = 1; with
-//       Velocity = 0, the default, Y is ignored and every note is full level)
-//   Z : V/oct pitch (knob + jack), 0 V = C4 after 'Cal Z'
+//   X : V/oct pitch, 0 V = C4 before Octave (factory-calibrated input)
+//   Y : gate (high above 1 V, low below 0.5 V)
+//   Z : velocity, knob + jack: knob fully CCW = silent, fully CW = full
 //   A : sub (Level 99 = 5 V peak at full velocity)
 //   B : envelope, 0..5 V
 //
@@ -21,7 +20,6 @@
 
 #include "constants.h"
 #include "subBassDSP.h"
-#include "zcal.h"
 
 #define CONTROL_INTERVAL    16      // samples between control-rate updates (~4.7 kHz)
 
@@ -38,7 +36,6 @@ void subBass()
         [kSbQuant]   = "Quant",
         [kSbAttack]  = "Attack",
         [kSbRelease] = "Release",
-        [kSbVelocity] = "Velocity",
     };
 
     // min, max, default
@@ -51,17 +48,12 @@ void subBass()
         [3*kSbQuant]   =   0,  1,  1,
         [3*kSbAttack]  =   0, 99, 10,
         [3*kSbRelease] =   0, 99, 30,
-        [3*kSbVelocity] =  0,  1,  0,   // 0 = ignore Y (full level), 1 = Y sets note level
     };
     setParameterRanges( kSbNumParams, ranges );
 
-    readZCal();
-    if ( !zcalValid )
-        scrollMessageOnce( "Z not calibrated, use Cal Z" );     // the LED font has no ':'
-
     static SubBassState st;
-    sbInit( &st, pot );
-    sbControl( &st, (const signed char*)parameters, zcal.m_zeroQ16, zcal.m_semisPerCountQ16 );
+    sbInit( &st, ( ( inL - A[0] ) * Br[0] ) >> 24, pot );
+    sbControl( &st, (const signed char*)parameters );
 
     int controlCountdown = CONTROL_INTERVAL;
 
@@ -71,7 +63,7 @@ void subBass()
     {
         IDLE();
 
-        // calibrated inputs, volts .19: X = gate, Y = velocity
+        // calibrated inputs, volts .19: X = pitch, Y = gate
         int vX = ( ( inL - A[0] ) * Br[0] ) >> 24;
         int vY = ( ( inR - A[1] ) * Br[1] ) >> 24;
 
@@ -88,7 +80,7 @@ void subBass()
         if ( --controlCountdown == 0 )
         {
             controlCountdown = CONTROL_INTERVAL;
-            sbControl( &st, (const signed char*)parameters, zcal.m_zeroQ16, zcal.m_semisPerCountQ16 );
+            sbControl( &st, (const signed char*)parameters );
         }
 
         SHOW_POT_HANDLING_PARAM_NAME()

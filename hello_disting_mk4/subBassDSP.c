@@ -10,20 +10,25 @@ typedef long long i64;
 #define ENV_OUT_PEAK    ( 5 * VOLT )            // B at full envelope
 #define GATE_ON         ( VOLT )                // X above 1 V opens the gate...
 #define GATE_OFF        ( VOLT / 2 )            // ...below 0.5 V closes it
-#define VEL_FULL        ( 5 * VOLT )            // Y at 5 V = full velocity
-#define VEL_SLEW_SHIFT  ( 7 )                   // ~1.7 ms velocity smoothing
+#define Z_SILENT        ( 8 )                   // Z at or below this many counts = silent...
+#define Z_FULL          ( 1015 )                // ...at or above this = full velocity
+#define PITCH_SMOOTH_SHIFT ( 6 )                // ~0.85 ms smoothing on X
+#define VEL_SLEW_SHIFT  ( 7 )                   // ~1.7 ms velocity smoothing (Z is read at control rate)
 #define MAX_PHASE_INC   ( 0x10000000u )         // fs/16, about 4.7 kHz
-#define QUANT_HYST      ( 0xA000 )              // 0.625 semitone, Q16
+#define QUANT_HYST      ( 0x9000 )              // 0.5625 semitone, Q16 (X is accurate; just avoid chatter at the midpoint)
 #define Z_SMOOTH_SHIFT  ( 8 )                   // ~3.4 ms smoothing at 75 kHz
 #define ENV_FULL        ( 1 << 30 )
 #define ENV_ATTACK_AIM  ( ENV_FULL + ( ENV_FULL >> 2 ) )   // attack aims past full so it arrives
 #define ENV_SILENT      ( ENV_FULL / 1000 )     // -60 dB: below this a new gate restarts the waveform
 
-static int clampInt( i64 v, int lo, int hi )
+// velocity (Q15) from the smoothed Z reading (counts, 16 fractional bits)
+static int velocityFromZ( int zQ16 )
 {
-    if ( v < lo ) return lo;
-    if ( v > hi ) return hi;
-    return (int)v;
+    if ( zQ16 <= ( Z_SILENT << 16 ) )
+        return 0;
+    if ( zQ16 >= ( Z_FULL << 16 ) )
+        return 32767;
+    return (int)( ( (i64)( zQ16 - ( Z_SILENT << 16 ) ) * 32767 ) / ( ( Z_FULL - Z_SILENT ) << 16 ) );
 }
 
 static int paramClamp( const signed char* p, int i, int lo, int hi )
@@ -34,14 +39,15 @@ static int paramClamp( const signed char* p, int i, int lo, int hi )
     return v;
 }
 
-void sbInit( SubBassState* s, int zCounts )
+void sbInit( SubBassState* s, int pitchIn, int zCounts )
 {
     s->phase = 0;
+    s->pitchSmooth = pitchIn;
     s->zSmooth = zCounts << 16;
     s->gate = 0;
     s->env = 0;
-    s->velTarget = 0;
-    s->vel = 0;
+    s->velTarget = velocityFromZ( s->zSmooth );
+    s->vel = s->velTarget;                      // start at the knob's level, no ramp
     s->phaseInc = 0;
     s->curSemi = 0;
     s->quantPrimed = 0;
@@ -51,7 +57,6 @@ void sbInit( SubBassState* s, int zCounts )
     s->driveGain = 4096;
     s->driveMix = 0;
     s->levelVolts = 0;
-    s->useVelocity = 0;
 }
 
 // 2^(octQ16 / 65536), returned as a phase increment relative to C4
@@ -80,10 +85,10 @@ static unsigned int phaseIncForOctaves( int octQ16 )
     return (unsigned int)inc;
 }
 
-void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisPerCountQ16 )
+void sbControl( SubBassState* s, const signed char* p )
 {
-    // pitch: semitones relative to C4, Q16
-    int semis = (int)( ( (i64)( s->zSmooth - zZeroQ16 ) * zSemisPerCountQ16 ) >> 16 );
+    // pitch: semitones relative to C4, Q16. 1 V (2^19) = 12 semitones (12 * 2^16), so * 1.5
+    int semis = s->pitchSmooth + ( s->pitchSmooth >> 1 );
     if ( paramClamp( p, kSbQuant, 0, 1 ) )
     {
         int nearest = ( semis + 0x8000 ) >> 16;
@@ -110,7 +115,9 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
 
     s->attack = kAttackQ31[ paramClamp( p, kSbAttack, 0, 99 ) ];
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
-    s->useVelocity = paramClamp( p, kSbVelocity, 0, 1 );
+
+    // velocity from Z (knob + jack), Q15; per-sample slewing smooths these steps
+    s->velTarget = velocityFromZ( s->zSmooth );
 }
 
 static int sineAt( unsigned int ph )
@@ -153,23 +160,22 @@ static int saturate( int u )
     return ( ( 3 * u ) >> 1 ) - (int)( ( (i64)u * u * u ) >> 31 );
 }
 
-void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, int* outB )
+void sbProcess( SubBassState* s, int pitchIn, int gateIn, int zCounts, int* outA, int* outB )
 {
-    // Z smoothing
+    // input smoothing: X pitch lightly, Z (velocity) more
+    s->pitchSmooth += ( pitchIn - s->pitchSmooth ) >> PITCH_SMOOTH_SHIFT;
     s->zSmooth += ( ( zCounts << 16 ) - s->zSmooth ) >> Z_SMOOTH_SHIFT;
 
-    // gate with hysteresis; velocity is sampled when it opens
+    // gate with hysteresis
     if ( !s->gate && gateIn > GATE_ON )
     {
         s->gate = 1;
-        s->velTarget = s->useVelocity ? clampInt( ( (i64)velIn * 32767 ) / VEL_FULL, 0, 32767 ) : 32767;
         if ( s->env < ENV_SILENT )
         {
             // previous note has died away: start the waveform at phase 0 (a zero
             // crossing for sine, triangle and saw) so every note begins the same way.
             // If it is still sounding, keep the waveform running: a jump would click.
             s->phase = 0;
-            s->vel = s->velTarget;
         }
     }
     else if ( s->gate && gateIn < GATE_OFF )
