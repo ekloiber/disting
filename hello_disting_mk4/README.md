@@ -3,13 +3,26 @@ disting mk4
 
 firmware for the disting mk4 Eurorack module
 
-Requirements:
+Requirements
+------------
 
-Microchip Libraries for Applications, legacy v2013-06-15 version
-https://www.microchip.com/mplab/microchip-libraries-for-applications
-installed or symlinked to 'microchip_solutions_v2013-06-15' alongside the hello_disting_mk4 folder
+* MPLAB X IDE (current version)
+* MPLAB XC32 compiler (current version)
+* Microchip's "PIC32 Legacy Peripheral Libraries" package, installed into
+  that XC32. The framework uses the old peripheral library (`plib.h`), which
+  XC32 stopped shipping after v1.40; this package adds it back. (XC32 v1.34
+  also works, without the add-on.)
+* Python 3, to make `disting4.bin` (see below)
 
-Microchip XC32 compiler toolchain v1.34
+The Microchip Libraries for Applications (MLA) are no longer needed: the SD
+card code that used them has been removed (the "Test SD" menu item and the two
+SD playback settings are gone). Installing firmware from the SD card is done
+by the bootloader, not this code, so it is unaffected.
+
+When you open the project, MPLAB X may say the XC32 version it was saved with
+(1.34) is missing: choose your installed XC32 under Project Properties >
+Compiler Toolchain. Warnings are no longer treated as errors, since newer
+compilers warn about more of this older code.
 
 Sub voice (algorithm A1)
 ------------------------

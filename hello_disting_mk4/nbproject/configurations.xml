@@ -8,8 +8,6 @@
       <itemPath>algorithmNames.h</itemPath>
       <itemPath>settings.h</itemPath>
       <itemPath>presets.h</itemPath>
-      <itemPath>FSconfig.h</itemPath>
-      <itemPath>HardwareProfile.h</itemPath>
       <itemPath>pragma_configs.h</itemPath>
       <itemPath>bcdTable.h</itemPath>
       <itemPath>constants.h</itemPath>
@@ -26,10 +24,6 @@
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
                    projectFiles="true">
-      <logicalFolder name="f3" displayName="microchip solutions" projectFiles="true">
-        <itemPath>../microchip_solutions_v2013-06-15/Microchip/MDD File System/FSIO.c</itemPath>
-        <itemPath>../microchip_solutions_v2013-06-15/Microchip/MDD File System/SD-SPI.c</itemPath>
-      </logicalFolder>
       <itemPath>i2c.c</itemPath>
       <itemPath>calibrate.c</itemPath>
       <itemPath>display.c</itemPath>
@@ -48,7 +42,6 @@
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
-    <Elem>../microchip_solutions_v2013-06-15/Microchip/MDD File System</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
@@ -99,7 +92,7 @@
         <property key="enable-unroll-loops" value="false"/>
         <property key="exclude-floating-point" value="false"/>
         <property key="extra-include-directories"
-                  value="../microchip_solutions_v2013-06-15/Microchip/Include;./"/>
+                  value="./"/>
         <property key="generate-16-bit-code" value="false"/>
         <property key="generate-micro-compressed-code" value="false"/>
         <property key="isolate-each-function" value="false"/>
@@ -109,7 +102,7 @@
         <property key="post-instruction-scheduling" value="default"/>
         <property key="pre-instruction-scheduling" value="default"/>
         <property key="preprocessor-macros"
-                  value="_SUPPRESS_PLIB_WARNING;_DISABLE_OPENADC10_CONFIGPORT_WARNING;MEDIA_SOFT_DETECT;DEMO_BOARD"/>
+                  value="_SUPPRESS_PLIB_WARNING;_DISABLE_OPENADC10_CONFIGPORT_WARNING"/>
         <property key="strict-ansi" value="false"/>
         <property key="support-ansi" value="false"/>
         <property key="toplevel-reordering" value=""/>
@@ -117,7 +110,7 @@
         <property key="use-cci" value="false"/>
         <property key="use-iar" value="false"/>
         <property key="use-indirect-calls" value="false"/>
-        <appendMe value="-Wno-multichar -Werror"/>
+        <appendMe value="-Wno-multichar"/>
       </C32>
       <C32-AR>
         <property key="additional-options-chop-files" value="false"/>
@@ -429,7 +422,7 @@
         <property key="enable-unroll-loops" value="false"/>
         <property key="exclude-floating-point" value="false"/>
         <property key="extra-include-directories"
-                  value="../microchip_solutions_v2013-06-15/Microchip/Include;./"/>
+                  value="./"/>
         <property key="generate-16-bit-code" value="false"/>
         <property key="generate-micro-compressed-code" value="false"/>
         <property key="isolate-each-function" value="false"/>
@@ -439,7 +432,7 @@
         <property key="post-instruction-scheduling" value="default"/>
         <property key="pre-instruction-scheduling" value="default"/>
         <property key="preprocessor-macros"
-                  value="_SUPPRESS_PLIB_WARNING;_DISABLE_OPENADC10_CONFIGPORT_WARNING;MEDIA_SOFT_DETECT;DEMO_BOARD"/>
+                  value="_SUPPRESS_PLIB_WARNING;_DISABLE_OPENADC10_CONFIGPORT_WARNING"/>
         <property key="strict-ansi" value="false"/>
         <property key="support-ansi" value="false"/>
         <property key="toplevel-reordering" value=""/>
@@ -447,7 +440,7 @@
         <property key="use-cci" value="false"/>
         <property key="use-iar" value="false"/>
         <property key="use-indirect-calls" value="false"/>
-        <appendMe value="-Wno-multichar -Werror"/>
+        <appendMe value="-Wno-multichar"/>
       </C32>
       <C32-AR>
         <property key="additional-options-chop-files" value="false"/>

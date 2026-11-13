@@ -53,7 +53,6 @@ enum {
     kMenuLAlgorithm = 0,
     kMenuSave,
     kMenuLoad,
-    kMenuTestSD,
     kMenuSettings,
     kMenuCalZ,
     kNumMenuL,
@@ -63,7 +62,6 @@ char const * const menuLStrings[kNumMenuL] = {
     "Algorithm",
     "Save",
     "Load",
-    "Test SD",
     "Settings",
     "Cal Z",
 };
@@ -81,6 +79,9 @@ enum {
     kNumSettings,
 };
 
+// Settings shown in the menu. The two SD-playback settings (continuous
+// filenames, WAV sample rate) are hidden because this build has no SD card
+// code; they stay in the Settings struct so stored settings remain valid.
 char const * const settingsStrings[] = {
     "Brightness",
     "Recall enable",
@@ -88,10 +89,18 @@ char const * const settingsStrings[] = {
     "Out MIDI ch",
     "Thru MIDI",
     "Pgm Chng Alg",
-    "Cont filenames",
     "Scroll speed",
-    "WAV sample rate",
 };
+static const char settingsMenuToSetting[] = {
+    kSettingBrightness,
+    kSettingEnableRecall,
+    kSettingMidiChIn,
+    kSettingMidiChOut,
+    kSettingMidiThru,
+    kSettingMidiPgmOption,
+    kSettingScrollSpeed,
+};
+#define kNumSettingsMenuItems ( sizeof settingsStrings / sizeof settingsStrings[0] )
 
 unsigned int lastSlowTime = 0;
 
@@ -343,8 +352,8 @@ int menuTick()
                 {
                     // advance to right menu
                     menuR = 1;
-                    STATIC_ASSERT( kNumSettings == sizeof settingsStrings/sizeof settingsStrings[0] );
-                    numMenuR = kNumSettings;
+                    STATIC_ASSERT( kNumSettingsMenuItems == sizeof settingsMenuToSetting );
+                    numMenuR = kNumSettingsMenuItems;
                     menuRStrings = settingsStrings;
                     setMenuString( menuRStrings[ menuR-1 ] );
                     break;
@@ -373,18 +382,15 @@ int menuTick()
                         menuMax = kNumPresets-1;
                         displayMode = kDisplayModeMenuValue;
                         break;
-                    case kMenuTestSD:
-                        testSDCard();
-                        break;
                     case kMenuCalZ:
                         calibrateZ();
                         break;
                     case kMenuSettings:
-                        if ( menuR >= 1 && menuR <= kNumSettings )
+                        if ( menuR >= 1 && menuR <= kNumSettingsMenuItems )
                         {
                                 STATIC_ASSERT( kNumSettings == kNumEditableSettings );
                                 displayMode = kDisplayModeMenuValue;
-                                editingSetting = menuR - 1;
+                                editingSetting = settingsMenuToSetting[ menuR - 1 ];
                                 menuValue = settings.m_editable[ editingSetting ];
                                 menuMin = editingSettingRanges[ editingSetting ][ 0 ];
                                 menuMax = editingSettingRanges[ editingSetting ][ 1 ];

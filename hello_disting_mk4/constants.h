@@ -25,8 +25,7 @@ extern char pageBuffer[ BYTE_PAGE_SIZE ];
     
 //#define DEBUG_SD_TIMING
 
-typedef long long int64_t;
-typedef unsigned long long uint64_t;
+#include <stdint.h>     // int64_t, uint64_t (was typedef'd here; newer XC32 headers define them too)
 
 extern int pot;
 extern BYTE potMIDIOverride;
@@ -127,9 +126,6 @@ extern void SaveFavouritesToFlash(void);
 extern void WriteSettingsPage( const char* buffer );
 extern void enableRecallAccordingToSetting(void);
 
-extern BYTE sdActive;          // sd card algorithm active
-extern BYTE EnterSDMode(void);
-extern void LeaveSDMode(void);
 
 extern int ProcessMIDIIn( BYTE b );
 

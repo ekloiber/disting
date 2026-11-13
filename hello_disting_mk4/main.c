@@ -11,10 +11,6 @@
 
 #include "pragma_configs.h"
 
-#include "Compiler.h"
-#include "GenericTypeDefs.h"
-#include "HardwareProfile.h"
-#include "MDD File System/FSIO.h"
 
 // The bootloader only jumps to the application (at 0xBD008000) if this word is present.
 const int magic __attribute__((address(0xBD008370))) = 0xbadabeef;
@@ -54,7 +50,6 @@ char pendingSave = 0;
 
 BYTE potMIDIOverride = 0;
 
-BYTE sdActive = 0;          // sd card algorithm active
 
 void handleEncoderTurn( int encB )
 {
@@ -132,43 +127,6 @@ void enableRecallAccordingToSetting()
         UARTEnable( UART2, UART_DISABLE_FLAGS( UART_PERIPHERAL | UART_RX ) );
         PORTSetPinsDigitalOut( IOPORT_B, BIT_1 );
     }
-}
-
-BYTE EnterSDMode()
-{
-    MDD_SDSPI_InitIO();
-
-    return MDD_SDSPI_MediaDetect();
-}
-
-void LeaveSDMode()
-{
-    SpiChnClose( SPI_CHANNEL2 );
-}
-
-void testSDCard()
-{
-    BYTE sdPresent = EnterSDMode();
-    if ( !sdPresent )
-    {
-        scrollMessageOnceAndWait( "No SD card" );
-        return;
-    }
-    
-    FSInit();
-
-    FSFILE* F = FSfopen( "test.txt", "r" );
-    if ( F != NULL )
-    {
-        char buff[100];
-        memset( buff, 0, sizeof buff );
-        FSfread( buff, 1, (sizeof buff)-1, F );
-        scrollMessageOnceAndWait( buff );
-        
-        FSfclose( F );
-    }
-    
-    LeaveSDMode();
 }
 
 int ProcessMIDIIn( BYTE b )
@@ -325,19 +283,8 @@ int main(int argc, char** argv) {
         int sel = selector;
         if ( sel >= 112 )
             sel = settings.m_favourites[ sel - 112 ];
-        if ( sel >= kNumAlgorithms )    // before the SD check: no SD algorithms in this build
+        if ( sel >= kNumAlgorithms )
             sel = 0;
-        if ( sel >= 64 && sel < 88 )
-        {
-            BYTE sdPresent = EnterSDMode();
-            if ( sdPresent )
-                sdActive = 1;
-            else
-            {
-                scrollMessageOnce( "No SD card" );
-                sel = 0;
-            }
-        }
         actuallyRunningSelector = sel;
         
         static algorithm* const algorithms[kNumAlgorithms] = {
@@ -346,8 +293,6 @@ int main(int argc, char** argv) {
         if ( sel >= sizeof algorithms/sizeof algorithms[0] )
             sel = 0;
         algorithms[sel]();
-
-        sdActive = 0;
         LeaveSDMode();
         
         if ( pendingSave )
