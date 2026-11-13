@@ -293,7 +293,6 @@ int main(int argc, char** argv) {
         if ( sel >= sizeof algorithms/sizeof algorithms[0] )
             sel = 0;
         algorithms[sel]();
-        LeaveSDMode();
         
         if ( pendingSave )
             handlePendingSave();
