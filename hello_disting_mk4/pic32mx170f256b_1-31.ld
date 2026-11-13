@@ -18,7 +18,7 @@ PROVIDE(_min_stack_size = 0x400) ;
 /*************************************************************************
  * Processor-specific object file.  Contains SFR definitions.
  *************************************************************************/
-INPUT("processor.o")
+OPTIONAL("processor.o")   /* XC32 1.x shipped this; newer XC32 + device packs do not (matches the DFP script) */
 
 /*************************************************************************
  * Processor-specific peripheral libraries are optional
