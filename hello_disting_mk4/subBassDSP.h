@@ -2,7 +2,7 @@
 // Compiled into the firmware and into tools/subbass_host_test.c.
 //
 //   X : gate (high above 1 V, low below 0.5 V)
-//   Y : velocity, 0..5 V, sampled when the gate opens
+//   Y : velocity, 0..5 V, sampled when the gate opens (only if Velocity = 1)
 //   Z : V/oct pitch (knob + jack)
 //   A : sub, Level 99 = 5 V peak at full envelope and velocity
 //   B : envelope, 0..5 V (not scaled by velocity or Level)
@@ -27,6 +27,7 @@ enum {
     kSbQuant,       // 0..1    snap pitch to semitones
     kSbAttack,      // 0..99   0.5 ms .. 200 ms (time constant)
     kSbRelease,     // 0..99   10 ms .. 2 s (time constant)
+    kSbVelocity,    // 0..1    0 = ignore Y (always full), 1 = Y sets the note level
     kSbNumParams
 };
 
@@ -45,6 +46,7 @@ typedef struct {
     int shapePos;                   // 0 .. 3<<16
     int driveGain, driveMix;        // Q12 gain, Q15 dry/wet
     int levelVolts;                 // .19 volts at full envelope and velocity
+    int useVelocity;                // read Y at each gate
 } SubBassState;
 
 // zCounts: current Z reading, used to start the smoother without a glide

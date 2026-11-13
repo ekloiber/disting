@@ -39,7 +39,7 @@ This build has a single algorithm: a gated sub-bass voice.
 | Socket | Use |
 |---|---|
 | X | gate: high above 1 V, low below 0.5 V |
-| Y | velocity: 0..5 V, sampled when the gate opens (0 V or less = silent, above 5 V = full) |
+| Y | velocity, only if parameter 8 (Velocity) = 1: 0..5 V, sampled when the gate opens (0 V or less = silent, above 5 V = full). With Velocity = 0 (default) Y is ignored and every note plays at full level |
 | Z | V/oct pitch (the Z knob is added to the jack; keep it fully counter-clockwise) |
 | A | sub audio; Level 99 = 5 V peak at full velocity |
 | B | envelope CV, 0..5 V (not scaled by velocity or Level) |
@@ -54,7 +54,7 @@ note begins identically. This only happens when the previous note has
 released below -60 dB: if it is still sounding, the waveform keeps running,
 because jumping it back to zero would click. Velocity is
 read once per note; changing Y during a note has no effect until the next
-gate. 0 V on Z is C4 before the Octave parameter, so the default
+gate (with Velocity = 1). 0 V on Z is C4 before the Octave parameter, so the default
 (Octave -2) puts 0 V at C2.
 
 | # | Name | Range | Default | Meaning |
@@ -67,6 +67,7 @@ gate. 0 V on Z is C4 before the Octave parameter, so the default
 | 5 | Quant | 0..1 | 1 | snap pitch to semitones (hides Z reading noise) |
 | 6 | Attack | 0..99 | 10 | 0.5 ms .. 200 ms (time constant; full level arrives after about 1.6x) |
 | 7 | Release | 0..99 | 30 | 10 ms .. 2 s (time constant) |
+| 8 | Velocity | 0..1 | 0 | 0 = ignore Y, full level every note; 1 = Y sets the note level |
 
 Controls are the framework's: turn S to edit, hold S and turn to pick a
 parameter (its number shows, then its name scrolls), press S for the menu.

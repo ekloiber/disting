@@ -51,6 +51,7 @@ void sbInit( SubBassState* s, int zCounts )
     s->driveGain = 4096;
     s->driveMix = 0;
     s->levelVolts = 0;
+    s->useVelocity = 0;
 }
 
 // 2^(octQ16 / 65536), returned as a phase increment relative to C4
@@ -109,6 +110,7 @@ void sbControl( SubBassState* s, const signed char* p, int zZeroQ16, int zSemisP
 
     s->attack = kAttackQ31[ paramClamp( p, kSbAttack, 0, 99 ) ];
     s->release = kReleaseQ31[ paramClamp( p, kSbRelease, 0, 99 ) ];
+    s->useVelocity = paramClamp( p, kSbVelocity, 0, 1 );
 }
 
 static int sineAt( unsigned int ph )
@@ -160,7 +162,7 @@ void sbProcess( SubBassState* s, int gateIn, int velIn, int zCounts, int* outA, 
     if ( !s->gate && gateIn > GATE_ON )
     {
         s->gate = 1;
-        s->velTarget = clampInt( ( (i64)velIn * 32767 ) / VEL_FULL, 0, 32767 );
+        s->velTarget = s->useVelocity ? clampInt( ( (i64)velIn * 32767 ) / VEL_FULL, 0, 32767 ) : 32767;
         if ( s->env < ENV_SILENT )
         {
             // previous note has died away: start the waveform at phase 0 (a zero

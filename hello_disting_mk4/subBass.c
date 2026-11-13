@@ -1,7 +1,8 @@
 // A1: Sub voice
 //
 //   X : gate (high above 1 V, low below 0.5 V)
-//   Y : velocity, 0..5 V, sampled when the gate opens
+//   Y : velocity, 0..5 V, sampled when the gate opens (Velocity = 1; with
+//       Velocity = 0, the default, Y is ignored and every note is full level)
 //   Z : V/oct pitch (knob + jack), 0 V = C4 after 'Cal Z'
 //   A : sub (Level 99 = 5 V peak at full velocity)
 //   B : envelope, 0..5 V
@@ -37,6 +38,7 @@ void subBass()
         [kSbQuant]   = "Quant",
         [kSbAttack]  = "Attack",
         [kSbRelease] = "Release",
+        [kSbVelocity] = "Velocity",
     };
 
     // min, max, default
@@ -49,6 +51,7 @@ void subBass()
         [3*kSbQuant]   =   0,  1,  1,
         [3*kSbAttack]  =   0, 99, 10,
         [3*kSbRelease] =   0, 99, 30,
+        [3*kSbVelocity] =  0,  1,  0,   // 0 = ignore Y (full level), 1 = Y sets note level
     };
     setParameterRanges( kSbNumParams, ranges );
 

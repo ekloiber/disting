@@ -24,6 +24,7 @@
 static const signed char kDefaults[kSbNumParams] = {
     [kSbShape] = 0, [kSbDrive] = 0, [kSbLevel] = 50, [kSbOctave] = -2,
     [kSbFine] = 0, [kSbQuant] = 1, [kSbAttack] = 10, [kSbRelease] = 30,
+    [kSbVelocity] = 0,
 };
 
 // calibration used by the tests: 0 V = 300 counts, 128 counts per volt
@@ -179,25 +180,32 @@ int main( void )
     }
 
     printf( "-- velocity (Level 99) --\n" );
-    r = gateRun( 5, 5 );
-    n = run( &r, 0.5 );
-    CHECK_RANGE( "5 V velocity: A peak 5 V", peakA( 200, 500 ), 4.95, 5.05 );
-    r = gateRun( 5, 2.5 );
-    n = run( &r, 0.5 );
-    CHECK_RANGE( "2.5 V velocity: A peak 2.5 V", peakA( 200, 500 ), 2.45, 2.55 );
-    CHECK_RANGE( "2.5 V velocity: B still 5 V (envelope only)", bAt( 400 ), 4.99, 5.0 );
     r = gateRun( 5, 0 );
     n = run( &r, 0.5 );
+    CHECK_RANGE( "Velocity 0 (default): Y unpatched (0 V) -> full 5 V", peakA( 200, 500 ), 4.95, 5.05 );
+    r = gateRun( 5, 2.5 );
+    n = run( &r, 0.5 );
+    CHECK_RANGE( "Velocity 0 (default): Y 2.5 V ignored -> full 5 V", peakA( 200, 500 ), 4.95, 5.05 );
+
+    r = gateRun( 5, 5 ); r.p[kSbVelocity] = 1;
+    n = run( &r, 0.5 );
+    CHECK_RANGE( "Velocity 1, 5 V: A peak 5 V", peakA( 200, 500 ), 4.95, 5.05 );
+    r = gateRun( 5, 2.5 ); r.p[kSbVelocity] = 1;
+    n = run( &r, 0.5 );
+    CHECK_RANGE( "Velocity 1, 2.5 V: A peak 2.5 V", peakA( 200, 500 ), 2.45, 2.55 );
+    CHECK_RANGE( "2.5 V velocity: B still 5 V (envelope only)", bAt( 400 ), 4.99, 5.0 );
+    r = gateRun( 5, 0 ); r.p[kSbVelocity] = 1;
+    n = run( &r, 0.5 );
     CHECK_RANGE( "0 V velocity: A silent", peakA( 200, 500 ), 0, 0.001 );
-    r = gateRun( 5, -3 );
+    r = gateRun( 5, -3 ); r.p[kSbVelocity] = 1;
     n = run( &r, 0.5 );
     CHECK_RANGE( "-3 V velocity: A silent", peakA( 200, 500 ), 0, 0.001 );
-    r = gateRun( 5, 8 );
+    r = gateRun( 5, 8 ); r.p[kSbVelocity] = 1;
     n = run( &r, 0.5 );
     CHECK_RANGE( "8 V velocity: capped at 5 V peak", peakA( 200, 500 ), 4.95, 5.05 );
 
     // velocity changes mid-note are ignored until the next gate
-    r = gateRun( 5, 1 ); r.n = 3; r.atMs[2] = 200; r.gateV[2] = 5; r.velV[2] = 5;
+    r = gateRun( 5, 1 ); r.p[kSbVelocity] = 1; r.n = 3; r.atMs[2] = 200; r.gateV[2] = 5; r.velV[2] = 5;
     n = run( &r, 0.5 );
     CHECK_RANGE( "Velocity sampled at gate: Y 1 V -> 5 V mid-note, A stays 1 V", peakA( 300, 500 ), 0.95, 1.05 );
 
