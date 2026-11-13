@@ -29,3 +29,5 @@
 /hello_disting_mk4/dist/MX170F256D/
 /hello_disting_mk4/build/MX170F256D_for_bootloader/
 /hello_disting_mk4/dist/MX170F256D_for_bootloader/
+# built locally by tools/build_plib.py from the XC32 sources
+/hello_disting_mk4/plib/

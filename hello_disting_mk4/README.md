@@ -8,10 +8,17 @@ Requirements
 
 * MPLAB X IDE (current version)
 * MPLAB XC32 compiler (current version)
-* Microchip's "PIC32 Legacy Peripheral Libraries" package, installed into
-  that XC32. The framework uses the old peripheral library (`plib.h`), which
-  XC32 stopped shipping after v1.40; this package adds it back. (XC32 v1.34
-  also works, without the add-on.)
+* The legacy peripheral library (`plib`). Current XC32 ships its headers and
+  source but not the built library. Build it once per machine:
+
+      python3 tools/build_plib.py
+
+  This compiles the sources in your XC32's `pic32-libs/peripheral` into
+  `hello_disting_mk4/plib/libmchp_peripheral_32MX170F256D.a` (not committed),
+  which the project links. If the compiler cannot find `plib.h` or
+  `GenericTypeDefs.h`, copy them (and the `peripheral` folder) from
+  `pic32-libs/include` or `pic32mx/include` into `pic32m/include`.
+  (XC32 v1.34 has everything built in and needs none of this.)
 * Python 3, to make `disting4.bin` (see below)
 
 The Microchip Libraries for Applications (MLA) are no longer needed: the SD
