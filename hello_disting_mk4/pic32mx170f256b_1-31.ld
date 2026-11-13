@@ -24,7 +24,7 @@ INPUT("processor.o")
  * Processor-specific peripheral libraries are optional
  *************************************************************************/
 OPTIONAL("libmchp_peripheral.a")
-OPTIONAL("libmchp_peripheral_32MX150F128D.a")
+OPTIONAL("libmchp_peripheral_32MX170F256D.a")
 
 /*************************************************************************
  * For interrupt vector handling
